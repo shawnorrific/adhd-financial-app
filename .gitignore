@@ -1,0 +1,21 @@
+node_modules/
+
+# SQLite database and WAL files — never commit live financial data
+*.db
+*.db-shm
+*.db-wal
+
+# Electron build output
+dist/
+out/
+
+# macOS metadata
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Environment / secrets (future)
+.env
+.env.*
