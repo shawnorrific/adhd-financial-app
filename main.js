@@ -2,6 +2,8 @@ require('dotenv').config();
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 
+app.name = 'ADHD Finance';
+
 // All modules that touch the DB are required inside app.whenReady() so that
 // app.getPath('userData') is available when db.js first opens the database.
 let db;
