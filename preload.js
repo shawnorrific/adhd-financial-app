@@ -87,4 +87,8 @@ contextBridge.exposeInMainWorld('api', {
     delete:     batchId              => ipcRenderer.invoke('imports:delete', batchId),
   },
 
+  danger: {
+    wipe: target => ipcRenderer.invoke('danger:wipe', target),
+  },
+
 });
