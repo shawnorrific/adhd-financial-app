@@ -221,7 +221,21 @@ function getStatus() {
   };
 }
 
-function disconnect() {
+async function disconnect() {
+  // Delete all synced calendar events before clearing local references,
+  // so a future reconnect + sync doesn't create duplicates.
+  try {
+    const token = await getAccessToken();
+    const bills = db.all('SELECT id, calendar_event_id FROM bills WHERE calendar_event_id IS NOT NULL');
+    await Promise.allSettled(
+      bills.map(b =>
+        calRequest('DELETE', `/calendars/primary/events/${b.calendar_event_id}`, null, token)
+          .catch(() => {}) // ignore 404s / already-deleted events
+      )
+    );
+  } catch {
+    // Not connected or token refresh failed — skip remote cleanup, clear local refs anyway
+  }
   ['google_refresh_token', 'google_access_token', 'google_user_email'].forEach(k => setSetting(k, ''));
   setSetting('google_token_expiry', '0');
   db.run('UPDATE bills SET calendar_event_id = NULL');
@@ -237,7 +251,15 @@ async function syncBill(billId) {
   const event = buildEvent(bill);
 
   if (bill.calendar_event_id) {
-    await calRequest('PUT', `/calendars/primary/events/${bill.calendar_event_id}`, event, token);
+    try {
+      await calRequest('PUT', `/calendars/primary/events/${bill.calendar_event_id}`, event, token);
+    } catch (err) {
+      // Event was manually deleted from Google Calendar — clear the stale ID and re-create
+      if (!/404|Not Found|Gone/i.test(err.message)) throw err;
+      db.run('UPDATE bills SET calendar_event_id = NULL WHERE id = ?', [billId]);
+      const created = await calRequest('POST', '/calendars/primary/events', event, token);
+      db.run('UPDATE bills SET calendar_event_id = ? WHERE id = ?', [created.id, billId]);
+    }
   } else {
     const created = await calRequest('POST', '/calendars/primary/events', event, token);
     db.run('UPDATE bills SET calendar_event_id = ? WHERE id = ?', [created.id, billId]);
