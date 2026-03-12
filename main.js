@@ -327,3 +327,18 @@ ipcMain.handle('imports:delete', (_, batchId) => {
   db.run('DELETE FROM import_batches WHERE id = ?',              [batchId]);
   return { ok: true };
 });
+
+// ── IPC: danger zone (testing utility) ───────────────────────────────────────
+ipcMain.handle('danger:wipe', (_, target) => {
+  if (target === 'transactions' || target === 'all') {
+    db.run('DELETE FROM transactions');
+    db.run('DELETE FROM import_batches');
+  }
+  if (target === 'bills' || target === 'all') {
+    db.run('DELETE FROM bills');
+  }
+  if (target === 'accounts' || target === 'all') {
+    db.run('DELETE FROM accounts');
+  }
+  return { ok: true };
+});

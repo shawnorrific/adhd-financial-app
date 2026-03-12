@@ -211,8 +211,14 @@
 
         m('div.dashboard-body', [
 
-          // ── Account filter ───────────────────────────────────────────────
-          accountPills(),
+          // ── Account filter + refresh ─────────────────────────────────────
+          m('div.dashboard-top-bar', [
+            accountPills(),
+            m('button.btn.btn-ghost.dashboard-refresh-btn', {
+              title:   'Refresh data',
+              onclick() { loadData(vnode); },
+            }, '↻'),
+          ]),
 
           s.loading && m('p.status-msg', '⏳ Loading…'),
           s.error   && m('p.error-msg', `⚠️ ${s.error}`),
