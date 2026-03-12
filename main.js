@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog } = require('electron');
 const path = require('path');
 
 app.name = 'ADHD Finance';
@@ -12,6 +12,8 @@ let categorizer;
 let csvImporter;
 let dashboard;
 let googleCalendar;
+let folderWatcher;
+let mainWindow = null;
 
 const ICON_PATH = path.join(
   __dirname, 'assets',
@@ -19,7 +21,7 @@ const ICON_PATH = path.join(
 );
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: ICON_PATH,
@@ -30,7 +32,7 @@ function createWindow() {
     },
   });
 
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
 app.whenReady().then(() => {
@@ -47,12 +49,18 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  folderWatcher = require('./src/folder-watcher');
+  folderWatcher.start(mainWindow);
+
   if (process.platform === 'darwin' && app.dock) {
     app.dock.setIcon(ICON_PATH);
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+      folderWatcher.start(mainWindow);
+    }
   });
 });
 
@@ -68,8 +76,8 @@ ipcMain.handle('db:ping', () => {
 
 // ── IPC: CSV import ───────────────────────────────────────────────────────────
 ipcMain.handle('csv:preview', (_, content) => csvImporter.previewCSV(content));
-ipcMain.handle('csv:import',  (_, { rows, accountId }) =>
-  csvImporter.importRows(rows, accountId || null));
+ipcMain.handle('csv:import',  (_, { rows, accountId, filename }) =>
+  csvImporter.importRows(rows, accountId || null, filename || null));
 
 // ── IPC: transactions ─────────────────────────────────────────────────────────
 ipcMain.handle('transactions:list', (_, { limit = 200, offset = 0, accountId } = {}) => {
@@ -218,13 +226,19 @@ ipcMain.handle('bills:delete', (_, id) => {
   return { ok: true };
 });
 
+// ── IPC: transaction delete ───────────────────────────────────────────────────
+ipcMain.handle('transactions:delete', (_, id) => {
+  db.run('DELETE FROM transactions WHERE id = ?', [id]);
+  return { ok: true };
+});
+
 // ── IPC: transaction update ───────────────────────────────────────────────────
-ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId, accountId }) => {
+ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId, accountId, postDate }) => {
   db.run(
     `UPDATE transactions
-     SET    description=?, amount=?, category_id=?, account_id=?, is_user_categorized=1
+     SET    description=?, amount=?, category_id=?, account_id=?, post_date=?, is_user_categorized=1
      WHERE  id=?`,
-    [description, parseFloat(amount), categoryId || null, accountId || null, id]
+    [description, parseFloat(amount), categoryId || null, accountId || null, postDate || null, id]
   );
   if (description && categoryId) categorizer.learnCorrection(description, categoryId);
   return { ok: true };
@@ -271,4 +285,45 @@ ipcMain.handle('gcal:sync-all', async () => {
 ipcMain.handle('shell:open-external', (_, url) => {
   // Only allow https:// URLs to prevent abuse
   if (url.startsWith('https://')) shell.openExternal(url);
+});
+
+// ── IPC: watch folder ─────────────────────────────────────────────────────────
+ipcMain.handle('watcher:get-path', () => folderWatcher.getWatchPath());
+
+ipcMain.handle('watcher:set-path', (_, newPath) => {
+  db.run(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    ['watch_folder_path', String(newPath)]
+  );
+  folderWatcher.start(mainWindow);
+  return { ok: true };
+});
+
+ipcMain.handle('dialog:open-folder', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Watch Folder',
+    properties: ['openDirectory'],
+  });
+  return canceled ? null : filePaths[0];
+});
+
+// ── IPC: import history ───────────────────────────────────────────────────────
+ipcMain.handle('imports:list', () =>
+  db.all(`
+    SELECT b.*, a.name AS account_name, a.color AS account_color
+    FROM   import_batches b
+    LEFT JOIN accounts a ON a.id = b.account_id
+    ORDER  BY b.imported_at DESC
+  `));
+
+ipcMain.handle('imports:set-account', (_, { batchId, accountId }) => {
+  db.run('UPDATE import_batches  SET account_id = ? WHERE id = ?',           [accountId || null, batchId]);
+  db.run('UPDATE transactions    SET account_id = ? WHERE import_batch_id = ?', [accountId || null, batchId]);
+  return { ok: true };
+});
+
+ipcMain.handle('imports:delete', (_, batchId) => {
+  db.run('DELETE FROM transactions   WHERE import_batch_id = ?', [batchId]);
+  db.run('DELETE FROM import_batches WHERE id = ?',              [batchId]);
+  return { ok: true };
 });

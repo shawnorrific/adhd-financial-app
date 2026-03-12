@@ -6,11 +6,14 @@ const { categorize, learnCorrection } = require('./categorizer');
 // ── CSV parsing ───────────────────────────────────────────────────────────────
 
 /**
- * Parse CSV text in Verity Credit Union export format.
+ * Parse CSV text in supported bank export formats.
  *
- * Expected columns (order may vary, detected by header row):
+ * Verity Credit Union columns (order may vary, detected by header row):
  *   Account Number, Post Date, Check, Description, Debit, Credit,
  *   Status, Balance, Classification
+ *
+ * Capital One columns:
+ *   Transaction Date, Posted Date, Card No., Description, Category, Debit, Credit
  *
  * @param {string} text - raw CSV file content
  * @returns {object[]} - normalised transaction objects
@@ -20,6 +23,16 @@ function parseCSV(text) {
   if (lines.length < 2) return [];
 
   const header = splitLine(lines[0]).map(h => h.trim().toLowerCase());
+
+  // Debug: log header columns and first data row so column-mapping issues are visible
+  // in the Electron main-process terminal.
+  console.log('[csv-importer] columns found:', header);
+  if (lines.length >= 2) {
+    const firstVals = splitLine(lines[1]);
+    const firstRowMap = {};
+    header.forEach((h, i) => { firstRowMap[h] = firstVals[i] ?? ''; });
+    console.log('[csv-importer] first row raw:', firstRowMap);
+  }
 
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -36,7 +49,8 @@ function parseCSV(text) {
 
     rows.push({
       accountNumber: col('account number') || null,
-      postDate:      toISO(col('post date') || col('postdate')),
+      // 'Post Date' = Verity CU  |  'Transaction Date' = Capital One
+      postDate:      toISO(col('post date') || col('postdate') || col('transaction date')),
       checkNumber:   col('check') || null,
       description:   col('description'),
       amount:        credit - debit,   // positive = money in, negative = money out
@@ -98,16 +112,31 @@ function previewCSV(text) {
 /**
  * Persist confirmed rows into the DB, associating them with the given account.
  * Saves a category_rule for any row the user manually re-categorised.
+ * Creates an import_batches record to group the rows for history tracking.
  *
- * @param {object[]} rows      - from previewCSV(), possibly with user-edited categoryId
+ * @param {object[]} rows         - from previewCSV(), possibly with user-edited categoryId
  * @param {number|null} accountId - account to associate all rows with
- * @returns {{ imported: number, skipped: number }}
+ * @param {string|null} filename  - original CSV filename, for history display
+ * @returns {{ imported: number, skipped: number, batchId: number|null }}
  */
-function importRows(rows, accountId = null) {
+function importRows(rows, accountId = null, filename = null) {
+  // Create a batch record up front so we have an id to tag transactions with
+  const batchRun = db.run(
+    'INSERT INTO import_batches (filename, account_id) VALUES (?, ?)',
+    [filename || null, accountId]
+  );
+  const batchId = batchRun.lastInsertRowid;
+
   let imported = 0;
   let skipped  = 0;
 
   for (const row of rows) {
+    // Guard: skip rows with missing required fields rather than writing bad data
+    if (!row.postDate || !row.description || !Number.isFinite(row.amount)) {
+      skipped++;
+      continue;
+    }
+
     // Teach the correction before inserting so the rule is in place
     if (row.isUserCorrected && row.categoryId) {
       learnCorrection(row.description, row.categoryId);
@@ -117,8 +146,9 @@ function importRows(rows, accountId = null) {
       db.run(`
         INSERT INTO transactions
           (account_number, post_date, check_number, description,
-           amount, status, balance, category_id, is_user_categorized, source, account_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?)
+           amount, status, balance, category_id, is_user_categorized, source, account_id,
+           import_batch_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?)
       `, [
         row.accountNumber  || null,
         row.postDate,
@@ -130,6 +160,7 @@ function importRows(rows, accountId = null) {
         row.categoryId     || null,
         row.isUserCorrected ? 1 : 0,
         accountId,
+        batchId,
       ]);
       imported++;
     } catch (e) {
@@ -141,7 +172,14 @@ function importRows(rows, accountId = null) {
     }
   }
 
-  return { imported, skipped };
+  // Nothing was inserted — remove the empty placeholder and return no batchId
+  if (imported === 0) {
+    db.run('DELETE FROM import_batches WHERE id = ?', [batchId]);
+    return { imported, skipped, batchId: null };
+  }
+
+  db.run('UPDATE import_batches SET tx_count = ? WHERE id = ?', [imported, batchId]);
+  return { imported, skipped, batchId };
 }
 
 module.exports = { previewCSV, importRows };

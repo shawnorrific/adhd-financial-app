@@ -7,14 +7,15 @@ contextBridge.exposeInMainWorld('api', {
   ping: () => ipcRenderer.invoke('db:ping'),
 
   csv: {
-    preview: content            => ipcRenderer.invoke('csv:preview', content),
-    import:  (rows, accountId)  => ipcRenderer.invoke('csv:import',  { rows, accountId }),
+    preview: content                      => ipcRenderer.invoke('csv:preview', content),
+    import:  (rows, accountId, filename)  => ipcRenderer.invoke('csv:import',  { rows, accountId, filename }),
   },
 
   transactions: {
     list:         opts              => ipcRenderer.invoke('transactions:list', opts),
     recategorize: (id, categoryId) => ipcRenderer.invoke('transaction:recategorize', { id, categoryId }),
     update:       (data)           => ipcRenderer.invoke('transactions:update', data),
+    delete:       id               => ipcRenderer.invoke('transactions:delete', id),
   },
 
   categories: {
@@ -58,6 +59,32 @@ contextBridge.exposeInMainWorld('api', {
 
   shell: {
     openExternal: url => ipcRenderer.invoke('shell:open-external', url),
+  },
+
+  watcher: {
+    getPath: ()       => ipcRenderer.invoke('watcher:get-path'),
+    setPath: newPath  => ipcRenderer.invoke('watcher:set-path', newPath),
+    // Returns a cleanup function — call it in onremove to avoid listener leaks
+    onImport: cb => {
+      const fn = (_, d) => cb(d);
+      ipcRenderer.on('watcher:imported', fn);
+      return () => ipcRenderer.removeListener('watcher:imported', fn);
+    },
+    onUnrecognized: cb => {
+      const fn = (_, d) => cb(d);
+      ipcRenderer.on('watcher:unrecognized', fn);
+      return () => ipcRenderer.removeListener('watcher:unrecognized', fn);
+    },
+  },
+
+  dialog: {
+    openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
+  },
+
+  imports: {
+    list:       ()                   => ipcRenderer.invoke('imports:list'),
+    setAccount: (batchId, accountId) => ipcRenderer.invoke('imports:set-account', { batchId, accountId }),
+    delete:     batchId              => ipcRenderer.invoke('imports:delete', batchId),
   },
 
 });

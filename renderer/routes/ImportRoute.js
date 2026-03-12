@@ -17,6 +17,13 @@
     return n < 0 ? `\u2212$${abs}` : `+$${abs}`;
   }
 
+  // SQLite datetime is UTC "YYYY-MM-DD HH:MM:SS" — convert to local display
+  function fmtDateTime(raw) {
+    if (!raw) return '';
+    const d = new Date(raw.replace(' ', 'T') + 'Z');
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
   // ── Component ────────────────────────────────────────────────────────────────
 
   const ImportRoute = {
@@ -30,15 +37,47 @@
       s.selectedAccount = null;     // account chosen before import
       s.stats           = null;
       s.error           = null;
+      s.pendingFilename = null;     // filename of the file currently being imported
+
+      // Watch folder state
+      s.watchInput = '';
+      s.watchSaved = false;
+      s.watchToast = null; // { type: 'imported'|'unrecognized', filename, imported?, skipped? }
+
+      // Import history
+      s.batches = [];
 
       Promise.all([
         window.api.categories.list(),
         window.api.accounts.list(),
-      ]).then(([cats, accounts]) => {
+        window.api.watcher.getPath(),
+        window.api.imports.list(),
+      ]).then(([cats, accounts, watchPath, batches]) => {
         s.categories = cats;
         s.accounts   = accounts;
+        s.watchInput = watchPath || '';
+        s.batches    = batches;
         m.redraw();
       });
+
+      // Subscribe to background-import events; store cleanup fns for onremove
+      s._offImport = window.api.watcher.onImport(async data => {
+        s.watchToast = { type: 'imported', ...data };
+        s.batches = await window.api.imports.list();
+        m.redraw();
+        setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
+      });
+      s._offUnrecognized = window.api.watcher.onUnrecognized(data => {
+        s.watchToast = { type: 'unrecognized', ...data };
+        m.redraw();
+        setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
+      });
+    },
+
+    onremove(vnode) {
+      const s = vnode.state;
+      if (s._offImport)       s._offImport();
+      if (s._offUnrecognized) s._offUnrecognized();
     },
 
     // Read the file with FileReader then call csv:preview over IPC
@@ -52,8 +91,9 @@
         return;
       }
 
-      s.stage = 'loading';
-      s.error = null;
+      s.stage           = 'loading';
+      s.error           = null;
+      s.pendingFilename = file.name;
       m.redraw();
 
       const reader = new FileReader();
@@ -78,8 +118,9 @@
       m.redraw();
       try {
         const accountId = s.selectedAccount ? s.selectedAccount.id : null;
-        s.stats = await window.api.csv.import(s.preview, accountId);
-        s.stage = 'done';
+        s.stats   = await window.api.csv.import(s.preview, accountId, s.pendingFilename);
+        s.batches = await window.api.imports.list();
+        s.stage   = 'done';
       } catch (err) {
         s.error = err.message || String(err);
         s.stage = 'error';
@@ -132,6 +173,48 @@
 
         m('div.import-body', [
           m('h1.page-title', 'Import Transactions'),
+
+          // ── Watch folder config ───────────────────────────────────────────
+          m('div.watch-folder-card', [
+            m('div.section-title', 'Watch Folder'),
+            m('p.watch-folder-hint',
+              'Place Verity Credit Union CSV exports here and they\'ll be imported automatically.'),
+            m('div.watch-folder-path-row', [
+              m('input.form-input[type=text]', {
+                value:       s.watchInput,
+                placeholder: '~/Downloads',
+                oninput(e)  { s.watchInput = e.target.value; },
+              }),
+              m('button.btn', {
+                async onclick() {
+                  const p = await window.api.dialog.openFolder();
+                  if (p) { s.watchInput = p; m.redraw(); }
+                },
+              }, 'Browse'),
+              m('button.btn.btn-primary', {
+                async onclick() {
+                  await window.api.watcher.setPath(s.watchInput);
+                  s.watchSaved = true;
+                  m.redraw();
+                  setTimeout(() => { s.watchSaved = false; m.redraw(); }, 2000);
+                },
+              }, s.watchSaved ? 'Saved!' : 'Save'),
+            ]),
+            s.watchToast && m('div.watch-toast', {
+              class: s.watchToast.type === 'imported'
+                ? 'watch-toast--imported'
+                : 'watch-toast--unrecognized',
+            }, [
+              s.watchToast.type === 'imported'
+                ? `Imported ${s.watchToast.imported} transaction${s.watchToast.imported !== 1 ? 's' : ''}` +
+                  (s.watchToast.skipped ? ` (${s.watchToast.skipped} duplicate${s.watchToast.skipped !== 1 ? 's' : ''} skipped)` : '') +
+                  ` from \u201c${s.watchToast.filename}\u201d.`
+                : `\u201c${s.watchToast.filename}\u201d was found but doesn\u2019t match the Verity Credit Union format.`,
+              m('button.watch-toast-dismiss', {
+                onclick() { s.watchToast = null; m.redraw(); },
+              }, '\u00d7'),
+            ]),
+          ]),
 
           // ── Account selector ─────────────────────────────────────────────
           (s.stage === 'idle' || s.stage === 'previewing') && accountSelector(),
@@ -215,7 +298,7 @@
             m('p.done-stat', [m('strong', s.stats.imported), ' transactions imported']),
             s.stats.skipped > 0 && m('p.done-skipped', `${s.stats.skipped} duplicate${s.stats.skipped !== 1 ? 's' : ''} skipped`),
             m('button.btn.btn-primary', {
-              onclick() { s.stage = 'idle'; s.preview = []; s.stats = null; m.redraw(); },
+              onclick() { s.stage = 'idle'; s.preview = []; s.stats = null; s.pendingFilename = null; m.redraw(); },
             }, 'Import another file'),
           ]),
 
@@ -223,8 +306,46 @@
           s.stage === 'error' && m('div.import-error', [
             m('p', `⚠\uFE0F ${s.error}`),
             m('button.btn', {
-              onclick() { s.stage = 'idle'; s.error = null; m.redraw(); },
+              onclick() { s.stage = 'idle'; s.error = null; s.pendingFilename = null; m.redraw(); },
             }, 'Try again'),
+          ]),
+
+          // ── Import history ────────────────────────────────────────────────
+          s.batches.length > 0 && m('div.import-history-section', [
+            m('div.section-title', 'Import History'),
+            m('div.import-batch-list',
+              s.batches.map(batch =>
+                m('div.import-batch-row', [
+                  m('div.import-batch-meta', [
+                    m('span.import-batch-filename', batch.filename || 'Unknown file'),
+                    m('span.import-batch-date', fmtDateTime(batch.imported_at)),
+                  ]),
+                  m('span.import-batch-count', `${batch.tx_count} tx`),
+                  m('select.cat-select.import-batch-account', {
+                    onchange(e) {
+                      const newId = e.target.value ? parseInt(e.target.value, 10) : null;
+                      batch.account_id = newId;
+                      window.api.imports.setAccount(batch.id, newId);
+                    },
+                  }, [
+                    m('option', { value: '', selected: !batch.account_id }, ''),
+                    ...s.accounts.map(acct =>
+                      m('option', { value: acct.id, selected: acct.id === batch.account_id }, acct.name)
+                    ),
+                  ]),
+                  m('button.btn.icon-btn.delete-btn', {
+                    title: `Delete all transactions from this import`,
+                    async onclick() {
+                      const label = batch.filename || 'this import';
+                      if (!window.confirm(`Delete all ${batch.tx_count} transaction${batch.tx_count !== 1 ? 's' : ''} from \u201c${label}\u201d? This cannot be undone.`)) return;
+                      await window.api.imports.delete(batch.id);
+                      s.batches = s.batches.filter(b => b.id !== batch.id);
+                      m.redraw();
+                    },
+                  }, '\uD83D\uDDD1'),
+                ])
+              )
+            ),
           ]),
 
         ]),

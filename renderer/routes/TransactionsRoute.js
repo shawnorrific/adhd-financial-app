@@ -47,6 +47,7 @@
 
   function blankDraft() {
     return {
+      postDate:      '',
       description:   '',
       amount:        '',
       categoryId:    '',
@@ -79,6 +80,7 @@
       const s      = vnode.state;
       s.editingId  = tx.id;
       s.draft      = {
+        postDate:      tx.post_date || '',
         description:   tx.description,
         amount:        String(tx.amount),
         categoryId:    tx.category_id    != null ? String(tx.category_id)  : '',
@@ -98,7 +100,7 @@
     async saveEdit(vnode) {
       const s = vnode.state;
       const d = s.draft;
-      if (!d.description.trim()) return;
+      if (!d.description.trim() || !d.postDate) return;
 
       s.saving = true;
       m.redraw();
@@ -106,6 +108,7 @@
       try {
         await window.api.transactions.update({
           id:          s.editingId,
+          postDate:    d.postDate,
           description: d.description.trim(),
           amount:      parseFloat(d.amount),
           categoryId:  d.categoryId ? parseInt(d.categoryId, 10) : null,
@@ -255,7 +258,7 @@
                       : m('span.muted', '—')
                   ),
 
-                  m('div.txl-col--action',
+                  m('div.txl-col--action', [
                     m('button.btn.btn-ghost.icon-btn', {
                       title:   isEditing ? 'Cancel edit' : 'Edit transaction',
                       onclick() {
@@ -263,14 +266,32 @@
                         else           { self.startEdit(vnode, tx); }
                         m.redraw();
                       },
-                    }, isEditing ? '✕' : '✎')
-                  ),
+                    }, isEditing ? '✕' : '✎'),
+                    m('button.btn.btn-ghost.icon-btn.delete-btn', {
+                      title: 'Delete transaction',
+                      async onclick() {
+                        if (!window.confirm(`Delete "${tx.description}"? This cannot be undone.`)) return;
+                        await window.api.transactions.delete(tx.id);
+                        s.txList = s.txList.filter(t => t.id !== tx.id);
+                        if (s.editingId === tx.id) { s.editingId = null; s.draft = blankDraft(); }
+                        m.redraw();
+                      },
+                    }, '\uD83D\uDDD1'),
+                  ]),
                 ]),
 
                 // ── Inline edit form ───────────────────────────────────────
                 isEditing && m('div.txl-edit-form', [
 
                   m('div.txl-edit-fields', [
+
+                    m('div.txl-edit-field', [
+                      m('label.form-label', 'Date'),
+                      m('input.form-input[type=date]', {
+                        value:   s.draft.postDate,
+                        oninput: e => { s.draft.postDate = e.target.value; },
+                      }),
+                    ]),
 
                     m('div.txl-edit-field', [
                       m('label.form-label', 'Description'),
@@ -345,7 +366,7 @@
                       onclick() { self.cancelEdit(vnode); m.redraw(); },
                     }, 'Cancel'),
                     m('button.btn.btn-primary', {
-                      disabled: !s.draft.description.trim() || s.saving,
+                      disabled: !s.draft.description.trim() || !s.draft.postDate || s.saving,
                       onclick()  { self.saveEdit(vnode); },
                     }, s.saving ? 'Saving…' : 'Save'),
                   ]),
