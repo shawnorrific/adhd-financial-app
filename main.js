@@ -7,6 +7,7 @@ let db;
 let runMigrations;
 let categorizer;
 let csvImporter;
+let dashboard;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -23,13 +24,14 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  db           = require('./db');
+  db            = require('./db');
   runMigrations = require('./migrations');
   runMigrations();
 
   // Require after migrations so all tables exist
   categorizer  = require('./src/categorizer');
   csvImporter  = require('./src/csv-importer');
+  dashboard    = require('./src/dashboard');
 
   createWindow();
 
@@ -42,25 +44,17 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// ── IPC handlers ──────────────────────────────────────────────────────────────
-
-// Health check — verifies Electron, IPC bridge, and SQLite are all reachable
+// ── IPC: health check ─────────────────────────────────────────────────────────
 ipcMain.handle('db:ping', () => {
   const row = db.get('SELECT sqlite_version() AS version');
   return { ok: true, sqliteVersion: row.version };
 });
 
-// Parse CSV text and return categorised rows WITHOUT writing to the DB
-ipcMain.handle('csv:preview', (_, content) => {
-  return csvImporter.previewCSV(content);
-});
+// ── IPC: CSV import ───────────────────────────────────────────────────────────
+ipcMain.handle('csv:preview', (_, content) => csvImporter.previewCSV(content));
+ipcMain.handle('csv:import',  (_, rows)    => csvImporter.importRows(rows));
 
-// Persist confirmed rows (user may have edited categoryId for some)
-ipcMain.handle('csv:import', (_, rows) => {
-  return csvImporter.importRows(rows);
-});
-
-// Transactions list — most recent first, with category info joined in
+// ── IPC: transactions ─────────────────────────────────────────────────────────
 ipcMain.handle('transactions:list', (_, { limit = 200, offset = 0 } = {}) => {
   return db.all(`
     SELECT t.*, c.name AS category_name, c.is_impulse
@@ -71,7 +65,6 @@ ipcMain.handle('transactions:list', (_, { limit = 200, offset = 0 } = {}) => {
   `, [limit, offset]);
 });
 
-// Update one transaction's category and teach it as a permanent rule
 ipcMain.handle('transaction:recategorize', (_, { id, categoryId }) => {
   db.run(
     'UPDATE transactions SET category_id = ?, is_user_categorized = 1 WHERE id = ?',
@@ -82,7 +75,62 @@ ipcMain.handle('transaction:recategorize', (_, { id, categoryId }) => {
   return { ok: true };
 });
 
-// All categories for dropdowns
-ipcMain.handle('categories:list', () => {
-  return db.all('SELECT * FROM categories ORDER BY name');
+// ── IPC: categories ───────────────────────────────────────────────────────────
+ipcMain.handle('categories:list', () =>
+  db.all('SELECT * FROM categories ORDER BY name'));
+
+// ── IPC: dashboard ────────────────────────────────────────────────────────────
+ipcMain.handle('dashboard:summary', () => dashboard.getSummary());
+
+// ── IPC: bills ────────────────────────────────────────────────────────────────
+ipcMain.handle('bills:list', () =>
+  db.all('SELECT * FROM bills WHERE is_active = 1 ORDER BY due_day, name'));
+
+ipcMain.handle('bills:detect', () =>
+  db.all(`
+    SELECT
+      t.description,
+      t.category_id,
+      c.name                                                  AS category_name,
+      COUNT(*)                                                AS occurrences,
+      ROUND(AVG(ABS(t.amount)), 2)                            AS avg_amount,
+      CAST(ROUND(AVG(CAST(strftime('%d', t.post_date) AS REAL))) AS INTEGER) AS avg_due_day,
+      ROUND(MAX(ABS(t.amount)) - MIN(ABS(t.amount)), 2)       AS amount_variance
+    FROM   transactions t
+    LEFT JOIN categories c ON c.id = t.category_id
+    WHERE  t.amount < 0
+      AND  t.post_date >= date('now', '-95 days')
+      AND  (c.name IS NULL OR c.name NOT IN ('Income', 'Transfer', 'ATM / Cash'))
+    GROUP  BY t.description
+    HAVING COUNT(*) >= 2
+      AND  (MAX(ABS(t.amount)) - MIN(ABS(t.amount))) < 15
+    ORDER  BY avg_amount DESC
+    LIMIT  20
+  `));
+
+ipcMain.handle('bills:save', (_, bill) => {
+  if (bill.id) {
+    db.run(
+      'UPDATE bills SET name=?, amount=?, due_day=?, category_id=?, is_active=? WHERE id=?',
+      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null, bill.is_active ?? 1, bill.id]
+    );
+  } else {
+    db.run(
+      'INSERT INTO bills (name, amount, due_day, category_id) VALUES (?, ?, ?, ?)',
+      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null]
+    );
+  }
+  return { ok: true };
+});
+
+// ── IPC: settings ─────────────────────────────────────────────────────────────
+ipcMain.handle('settings:get', (_, key) =>
+  db.get('SELECT value FROM settings WHERE key = ?', [key])?.value ?? null);
+
+ipcMain.handle('settings:set', (_, { key, value }) => {
+  db.run(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [key, String(value)]
+  );
+  return { ok: true };
 });

@@ -89,8 +89,9 @@
         // ── Top nav ──────────────────────────────────────────────────────────
         m('nav.app-nav', [
           m('span.nav-logo', 'ADHD Finance'),
-          m(m.route.Link, { href: '/test',   class: 'nav-link' }, 'Stack Check'),
-          m(m.route.Link, { href: '/import', class: 'nav-link active' }, 'Import CSV'),
+          m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
+          m(m.route.Link, { href: '/import',    class: 'nav-link active' }, 'Import CSV'),
+          m(m.route.Link, { href: '/test',      class: 'nav-link' }, 'Stack Check'),
         ]),
 
         m('div.import-body', [

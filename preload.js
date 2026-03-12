@@ -4,14 +4,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Nothing else from Node/Electron leaks through contextIsolation.
 contextBridge.exposeInMainWorld('api', {
 
-  // Health check: confirms IPC bridge and SQLite are reachable
+  // Health check
   ping: () => ipcRenderer.invoke('db:ping'),
 
   csv: {
-    // Parse a CSV file and return categorised rows — no DB write yet
     preview: content => ipcRenderer.invoke('csv:preview', content),
-    // Persist confirmed rows (may include user-corrected categories)
-    import:  rows    => ipcRenderer.invoke('csv:import', rows),
+    import:  rows    => ipcRenderer.invoke('csv:import',  rows),
   },
 
   transactions: {
@@ -21,6 +19,21 @@ contextBridge.exposeInMainWorld('api', {
 
   categories: {
     list: () => ipcRenderer.invoke('categories:list'),
+  },
+
+  dashboard: {
+    summary: () => ipcRenderer.invoke('dashboard:summary'),
+  },
+
+  bills: {
+    list:   ()     => ipcRenderer.invoke('bills:list'),
+    detect: ()     => ipcRenderer.invoke('bills:detect'),
+    save:   bill   => ipcRenderer.invoke('bills:save', bill),
+  },
+
+  settings: {
+    get: key          => ipcRenderer.invoke('settings:get', key),
+    set: (key, value) => ipcRenderer.invoke('settings:set', { key, value }),
   },
 
 });

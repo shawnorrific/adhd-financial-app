@@ -1,16 +1,13 @@
 // app.js — Mithril router entry point
-// Routes are defined in routes/*.js and loaded before this script.
+// Route components are defined in routes/*.js and loaded before this script.
 
 // ─── Test Route ───────────────────────────────────────────────────────────────
-// Confirms Electron IPC bridge + Mithril + SQLite are all wired up correctly.
-
 const TestRoute = {
   oninit(vnode) {
     vnode.state.status = 'checking…';
     vnode.state.ok     = null;
 
-    window.api
-      .ping()
+    window.api.ping()
       .then(result => {
         vnode.state.ok     = result.ok;
         vnode.state.status = `SQLite ${result.sqliteVersion}`;
@@ -31,8 +28,9 @@ const TestRoute = {
     return m('div.test-page', [
       m('nav.app-nav', [
         m('span.nav-logo', 'ADHD Finance'),
-        m(m.route.Link, { href: '/test',   class: 'nav-link active' }, 'Stack Check'),
-        m(m.route.Link, { href: '/import', class: 'nav-link' }, 'Import CSV'),
+        m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
+        m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
+        m(m.route.Link, { href: '/test',      class: 'nav-link active' }, 'Stack Check'),
       ]),
       m('div.test-body', [
         m('h1', 'Stack check'),
@@ -48,14 +46,14 @@ const TestRoute = {
           m('span.check-label', 'SQLite (better-sqlite3)'),
           m(`span.check-badge.${statusClass}`, `${icon} ${status}`),
         ]),
-        m('p.hint', 'Step 2 live — click Import CSV to bring in transactions.'),
       ]),
     ]);
   },
 };
 
 // ─── Router ───────────────────────────────────────────────────────────────────
-m.route(document.getElementById('app'), '/import', {
-  '/test':   TestRoute,
-  '/import': window.Routes.Import,
+m.route(document.getElementById('app'), '/dashboard', {
+  '/dashboard': window.Routes.Dashboard,
+  '/import':    window.Routes.Import,
+  '/test':      TestRoute,
 });
