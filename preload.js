@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   transactions: {
     list:         opts              => ipcRenderer.invoke('transactions:list', opts),
     recategorize: (id, categoryId) => ipcRenderer.invoke('transaction:recategorize', { id, categoryId }),
+    update:       (data)           => ipcRenderer.invoke('transactions:update', data),
   },
 
   categories: {

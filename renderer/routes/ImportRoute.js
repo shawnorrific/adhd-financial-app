@@ -17,12 +17,6 @@
     return n < 0 ? `\u2212$${abs}` : `+$${abs}`;
   }
 
-  const TYPE_LABELS = {
-    checking:    'Checking',
-    credit_card: 'Credit Card',
-    bnpl:        'BNPL (Affirm)',
-  };
-
   // ── Component ────────────────────────────────────────────────────────────────
 
   const ImportRoute = {
@@ -36,10 +30,6 @@
       s.selectedAccount = null;     // account chosen before import
       s.stats           = null;
       s.error           = null;
-      // Transaction history (existing transactions)
-      s.txHistory       = [];
-      s.txAccountId     = null;     // null = all accounts
-      s.txLoading       = true;
 
       Promise.all([
         window.api.categories.list(),
@@ -49,8 +39,6 @@
         s.accounts   = accounts;
         m.redraw();
       });
-
-      loadHistory(vnode);
     },
 
     // Read the file with FileReader then call csv:preview over IPC
@@ -92,7 +80,6 @@
         const accountId = s.selectedAccount ? s.selectedAccount.id : null;
         s.stats = await window.api.csv.import(s.preview, accountId);
         s.stage = 'done';
-        loadHistory(vnode);
       } catch (err) {
         s.error = err.message || String(err);
         s.stage = 'error';
@@ -130,30 +117,6 @@
         ]);
       }
 
-      // ── Transaction history filter ─────────────────────────────────────────
-      function historyFilter() {
-        if (!s.accounts.length) return null;
-        return m('div.account-filter-row', [
-          m('button.account-pill', {
-            class: s.txAccountId === null ? 'active' : '',
-            onclick() { s.txAccountId = null; loadHistory(vnode); },
-          }, 'All accounts'),
-          ...s.accounts.map(acct =>
-            m('button.account-pill', {
-              class: s.txAccountId === acct.id ? 'active' : '',
-              style: s.txAccountId === acct.id
-                ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
-                : `border-color:${acct.color}40; color:${acct.color}`,
-              onclick() { s.txAccountId = acct.id; loadHistory(vnode); },
-            }, [
-              m('span.pill-dot', { style: `background:${acct.color}` }),
-              acct.name,
-              m('span.pill-type', TYPE_LABELS[acct.type] || acct.type),
-            ])
-          ),
-        ]);
-      }
-
       return m('div.import-page', [
 
         // ── Top nav ──────────────────────────────────────────────────────────
@@ -163,7 +126,8 @@
           m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link active' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
-          m(m.route.Link, { href: '/purchase',  class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
+          m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
         ]),
 
         m('div.import-body', [
@@ -263,68 +227,10 @@
             }, 'Try again'),
           ]),
 
-          // ── Transaction history ─────────────────────────────────────────────
-          s.stage === 'idle' && m('div.tx-history-section', [
-            m('div.tx-history-header', [
-              m('h2.section-title', 'Transaction history'),
-              historyFilter(),
-            ]),
-
-            s.txLoading && m('p.status-msg', '⏳ Loading…'),
-
-            !s.txLoading && s.txHistory.length === 0 &&
-              m('p.section-hint', 'No transactions yet. Import a CSV to get started.'),
-
-            !s.txLoading && s.txHistory.length > 0 &&
-              m('div.table-scroll',
-                m('table.tx-table', [
-                  m('thead', m('tr', [
-                    m('th', 'Date'),
-                    m('th', 'Description'),
-                    m('th.right', 'Amount'),
-                    m('th', 'Category'),
-                    m('th', 'Account'),
-                  ])),
-                  m('tbody', s.txHistory.map(tx =>
-                    m('tr', { key: tx.id, class: tx.amount < 0 ? 'debit' : 'credit' }, [
-                      m('td.mono', fmtDate(tx.post_date)),
-                      m('td.desc', tx.description),
-                      m('td.amount.right.mono', fmtAmount(tx.amount)),
-                      m('td', tx.category_name || m('span.muted', 'Uncategorized')),
-                      m('td',
-                        tx.account_name
-                          ? m('span.account-type-badge.badge-sm', {
-                              style: `color:${tx.account_color}; border-color:${tx.account_color}40`,
-                            }, [
-                              m('span.pill-dot.dot-xs', { style: `background:${tx.account_color}` }),
-                              tx.account_name,
-                            ])
-                          : m('span.muted', '—')
-                      ),
-                    ])
-                  )),
-                ])
-              ),
-          ]),
-
         ]),
       ]);
     },
   };
-
-  function loadHistory(vnode) {
-    const s = vnode.state;
-    s.txLoading = true;
-    m.redraw();
-    window.api.transactions.list({ limit: 200, accountId: s.txAccountId }).then(rows => {
-      s.txHistory = rows;
-      s.txLoading = false;
-      m.redraw();
-    }).catch(() => {
-      s.txLoading = false;
-      m.redraw();
-    });
-  }
 
   window.Routes         = window.Routes || {};
   window.Routes.Import  = ImportRoute;

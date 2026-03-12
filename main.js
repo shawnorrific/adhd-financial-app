@@ -197,16 +197,16 @@ ipcMain.handle('bills:detect', () =>
 ipcMain.handle('bills:save', (_, bill) => {
   if (bill.id) {
     db.run(
-      'UPDATE bills SET name=?, amount=?, due_day=?, category_id=?, notes=?, account_id=? WHERE id=?',
+      'UPDATE bills SET name=?, amount=?, due_day=?, frequency=?, category_id=?, notes=?, account_id=? WHERE id=?',
       [bill.name, bill.amount ?? null, bill.due_day ?? null,
-       bill.category_id ?? null, bill.notes ?? null,
+       bill.frequency ?? null, bill.category_id ?? null, bill.notes ?? null,
        bill.account_id ?? null, bill.id]
     );
   } else {
     db.run(
-      'INSERT INTO bills (name, amount, due_day, category_id, notes, account_id) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO bills (name, amount, due_day, frequency, category_id, notes, account_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [bill.name, bill.amount ?? null, bill.due_day ?? null,
-       bill.category_id ?? null, bill.notes ?? null,
+       bill.frequency ?? null, bill.category_id ?? null, bill.notes ?? null,
        bill.account_id ?? null]
     );
   }
@@ -215,6 +215,18 @@ ipcMain.handle('bills:save', (_, bill) => {
 
 ipcMain.handle('bills:delete', (_, id) => {
   db.run('UPDATE bills SET is_active = 0 WHERE id = ?', [id]);
+  return { ok: true };
+});
+
+// ── IPC: transaction update ───────────────────────────────────────────────────
+ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId, accountId }) => {
+  db.run(
+    `UPDATE transactions
+     SET    description=?, amount=?, category_id=?, account_id=?, is_user_categorized=1
+     WHERE  id=?`,
+    [description, parseFloat(amount), categoryId || null, accountId || null, id]
+  );
+  if (description && categoryId) categorizer.learnCorrection(description, categoryId);
   return { ok: true };
 });
 

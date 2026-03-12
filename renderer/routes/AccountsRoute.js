@@ -157,7 +157,8 @@
           m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link active' }, 'Accounts'),
-          m(m.route.Link, { href: '/purchase',  class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
+          m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
         ]),
 
         m('div.accounts-body', [
