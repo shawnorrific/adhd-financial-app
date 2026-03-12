@@ -46,8 +46,8 @@
       s.bills    = bills;
       s.loading  = false;
 
-      // Auto-detect recurring charges only when no bills are configured yet
-      if (bills.length === 0 && summary.balance !== null) {
+      // Always detect recurring charges so the list stays available for adding more
+      if (summary.balance !== null) {
         window.api.bills.detect().then(detected => {
           s.detected = detected;
           m.redraw();
@@ -276,27 +276,33 @@
               })()),
             ]),
 
-            // ── Detected recurring charges (shown when no bills configured) ──
-            s.detected?.length > 0 && s.bills.length === 0 && m('div.detect-section', [
-              m('h2.section-title', 'Recurring charges detected'),
-              m('p.section-hint',
-                'These appear every month at a consistent amount. Add them as bills so the dashboard can track upcoming payments.'),
-              m('div.detect-list', s.detected.map(d =>
-                m('div.detect-row', [
-                  m('div.detect-info', [
-                    m('div.detect-name', d.description),
-                    m('div.detect-meta', [
-                      `~${fmtMoney(d.avg_amount)}`,
-                      d.avg_due_day ? ` \u00B7 around day\u00A0${d.avg_due_day}` : '',
-                      ` \u00B7 ${d.occurrences}\u00D7 in 3\u00A0months`,
+            // ── Detected recurring charges ───────────────────────────────────
+            // Filter out anything already tracked so the list stays accurate
+            // after each addition.
+            (() => {
+              const trackedNames = new Set(s.bills.map(b => b.name));
+              const untracked = (s.detected || []).filter(d => !trackedNames.has(d.description));
+              return untracked.length > 0 && m('div.detect-section', [
+                m('h2.section-title', 'Recurring charges detected'),
+                m('p.section-hint',
+                  'These appear monthly at a consistent amount. Add them as bills so the dashboard can track upcoming payments.'),
+                m('div.detect-list', untracked.map(d =>
+                  m('div.detect-row', [
+                    m('div.detect-info', [
+                      m('div.detect-name', d.description),
+                      m('div.detect-meta', [
+                        `~${fmtMoney(d.avg_amount)}`,
+                        d.avg_due_day ? ` \u00B7 around day\u00A0${d.avg_due_day}` : '',
+                        ` \u00B7 ${d.occurrences}\u00D7 in 3\u00A0months`,
+                      ]),
                     ]),
-                  ]),
-                  m('button.btn.btn-ghost', {
-                    onclick() { self.addBill(vnode, d); },
-                  }, '+ Track as bill'),
-                ])
-              )),
-            ]),
+                    m('button.btn.btn-ghost', {
+                      onclick() { self.addBill(vnode, d); },
+                    }, '+ Track as bill'),
+                  ])
+                )),
+              ]);
+            })(),
 
             // ── Configured bills list ────────────────────────────────────────
             s.bills.length > 0 && m('div.bills-section', [
