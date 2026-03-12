@@ -214,7 +214,7 @@
             s.txList.map(tx => {
               const isEditing = s.editingId === tx.id;
 
-              return m('div.txl-row-wrap', { key: tx.id }, [
+              return m('div.txl-row-wrap', [
 
                 // ── Read row ───────────────────────────────────────────────
                 m('div.txl-row', {

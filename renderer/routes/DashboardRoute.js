@@ -181,7 +181,6 @@
         if (!balances?.length) return null;
         return m('div.account-balance-strip', balances.map(acct =>
           m('div.acct-balance-card', {
-            key: acct.id,
             style: `border-left: 4px solid ${acct.color}`,
           }, [
             m('div.acct-card-header', [
