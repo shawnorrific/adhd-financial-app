@@ -4,12 +4,14 @@
   "description": "Local-first personal finance app for ADHD brains",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "rebuild": "prebuild-install --runtime electron --target 36.9.5 --arch x64 --platform linux"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.3"
+    "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
     "electron": "^36.9.5"
   },
   "license": "MIT"
