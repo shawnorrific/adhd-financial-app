@@ -33,10 +33,12 @@
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
-  function loadData(vnode) {
+  function loadData(vnode, { silent = false } = {}) {
     const s = vnode.state;
-    s.loading = true;
-    m.redraw();
+    if (!silent) {
+      s.loading = true;
+      m.redraw();
+    }
 
     Promise.all([
       window.api.dashboard.summary(),
@@ -101,7 +103,7 @@
         due_day:     detected.avg_due_day,
         category_id: detected.category_id,
       });
-      loadData(vnode);
+      loadData(vnode, { silent: true });
     },
 
     view(vnode) {
