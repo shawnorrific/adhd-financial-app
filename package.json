@@ -1,5 +1,6 @@
 {
   "name": "adhd-financial-app",
+  "productName": "ADHD Finance",
   "version": "0.1.0",
   "description": "Local-first personal finance app for ADHD brains",
   "main": "main.js",

@@ -11,10 +11,17 @@ let csvImporter;
 let dashboard;
 let googleCalendar;
 
+const ICON_PATH = path.join(
+  __dirname, 'assets',
+  process.platform === 'darwin'  ? 'icon.icns' :
+  process.platform === 'win32'   ? 'icon.ico'  : 'icon.png'
+);
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -37,6 +44,10 @@ app.whenReady().then(() => {
   googleCalendar  = require('./src/google-calendar');
 
   createWindow();
+
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(ICON_PATH);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

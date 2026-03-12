@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Rounded square background -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="#0f1117"/>
+  <!-- Lightning bolt: teal, centered, bold -->
+  <path d="M 588 96 L 312 556 L 484 556 L 436 928 L 712 468 L 540 468 Z"
+        fill="#00D4C8"
+        stroke="#00D4C8"
+        stroke-width="8"
+        stroke-linejoin="round"/>
+</svg>

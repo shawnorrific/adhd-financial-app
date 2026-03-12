@@ -13,7 +13,7 @@
   --yellow:    #f1c40f;
   --red:       #e74c3c;
   --red-dim:   rgba(231,76,60,.08);
-  --accent:    #5b7fff;
+  --accent:    #00D4C8;
   --radius:    8px;
   --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono:      'SF Mono', 'Fira Mono', 'Consolas', monospace;
@@ -76,8 +76,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   white-space: nowrap;
 }
 .btn:hover            { background: #2e3248; border-color: #3d4160; }
-.btn.btn-primary      { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.btn-primary:hover{ background: #4a6fee; border-color: #4a6fee; }
+.btn.btn-primary      { background: var(--accent); border-color: var(--accent); color: #0f1117; }
+.btn.btn-primary:hover{ background: #00b8ad; border-color: #00b8ad; color: #0f1117; }
 .btn.btn-ghost        { background: transparent; border-color: transparent; color: var(--muted); }
 .btn.btn-ghost:hover  { background: var(--surface2); color: var(--text); }
 
@@ -139,7 +139,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .status-banner.ok      { background: rgba(46,204,113,.10); border-color: rgba(46,204,113,.35); }
 .status-banner.tight   { background: rgba(241,196,15,.10); border-color: rgba(241,196,15,.35); }
 .status-banner.danger  { background: rgba(231,76,60,.10);  border-color: rgba(231,76,60,.35);  }
-.status-banner.setup   { background: rgba(91,127,255,.07); border-color: rgba(91,127,255,.30); }
+.status-banner.setup   { background: rgba(0,212,200,.07);  border-color: rgba(0,212,200,.30);  }
 .status-banner.unknown { background: var(--surface);       border-color: var(--border);        }
 
 .status-icon         { font-size: 40px; line-height: 1; flex-shrink: 0; }
@@ -485,7 +485,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 }
 .drop-zone:hover, .drop-zone.drag-over {
   border-color: var(--accent);
-  background: rgba(91,127,255,.05);
+  background: rgba(0,212,200,.05);
 }
 
 .drop-icon    { font-size: 48px; }
