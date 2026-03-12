@@ -227,12 +227,12 @@ ipcMain.handle('bills:delete', (_, id) => {
 });
 
 // ── IPC: transaction update ───────────────────────────────────────────────────
-ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId, accountId }) => {
+ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId, accountId, postDate }) => {
   db.run(
     `UPDATE transactions
-     SET    description=?, amount=?, category_id=?, account_id=?, is_user_categorized=1
+     SET    description=?, amount=?, category_id=?, account_id=?, post_date=?, is_user_categorized=1
      WHERE  id=?`,
-    [description, parseFloat(amount), categoryId || null, accountId || null, id]
+    [description, parseFloat(amount), categoryId || null, accountId || null, postDate || null, id]
   );
   if (description && categoryId) categorizer.learnCorrection(description, categoryId);
   return { ok: true };

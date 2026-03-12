@@ -47,6 +47,7 @@
 
   function blankDraft() {
     return {
+      postDate:      '',
       description:   '',
       amount:        '',
       categoryId:    '',
@@ -79,6 +80,7 @@
       const s      = vnode.state;
       s.editingId  = tx.id;
       s.draft      = {
+        postDate:      tx.post_date || '',
         description:   tx.description,
         amount:        String(tx.amount),
         categoryId:    tx.category_id    != null ? String(tx.category_id)  : '',
@@ -98,7 +100,7 @@
     async saveEdit(vnode) {
       const s = vnode.state;
       const d = s.draft;
-      if (!d.description.trim()) return;
+      if (!d.description.trim() || !d.postDate) return;
 
       s.saving = true;
       m.redraw();
@@ -106,6 +108,7 @@
       try {
         await window.api.transactions.update({
           id:          s.editingId,
+          postDate:    d.postDate,
           description: d.description.trim(),
           amount:      parseFloat(d.amount),
           categoryId:  d.categoryId ? parseInt(d.categoryId, 10) : null,
@@ -273,6 +276,14 @@
                   m('div.txl-edit-fields', [
 
                     m('div.txl-edit-field', [
+                      m('label.form-label', 'Date'),
+                      m('input.form-input[type=date]', {
+                        value:   s.draft.postDate,
+                        oninput: e => { s.draft.postDate = e.target.value; },
+                      }),
+                    ]),
+
+                    m('div.txl-edit-field', [
                       m('label.form-label', 'Description'),
                       m('input.form-input', {
                         value:   s.draft.description,
@@ -345,7 +356,7 @@
                       onclick() { self.cancelEdit(vnode); m.redraw(); },
                     }, 'Cancel'),
                     m('button.btn.btn-primary', {
-                      disabled: !s.draft.description.trim() || s.saving,
+                      disabled: !s.draft.description.trim() || !s.draft.postDate || s.saving,
                       onclick()  { self.saveEdit(vnode); },
                     }, s.saving ? 'Saving…' : 'Save'),
                   ]),

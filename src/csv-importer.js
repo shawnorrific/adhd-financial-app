@@ -117,6 +117,12 @@ function importRows(rows, accountId = null, filename = null) {
   let skipped  = 0;
 
   for (const row of rows) {
+    // Guard: skip rows with missing required fields rather than writing bad data
+    if (!row.postDate || !row.description || !Number.isFinite(row.amount)) {
+      skipped++;
+      continue;
+    }
+
     // Teach the correction before inserting so the rule is in place
     if (row.isUserCorrected && row.categoryId) {
       learnCorrection(row.description, row.categoryId);
