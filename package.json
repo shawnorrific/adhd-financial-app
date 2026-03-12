@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "rebuild": "prebuild-install --runtime electron --target 36.9.5"
+    "rebuild": "node scripts/rebuild.js",
+    "postinstall": "node scripts/rebuild.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2"
