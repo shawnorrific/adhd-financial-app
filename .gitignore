@@ -16,6 +16,7 @@ out/
 .vscode/
 .idea/
 
-# Environment / secrets (future)
+# Environment / secrets
 .env
-.env.*
+.env.local
+.env.*.local

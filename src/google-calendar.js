@@ -163,6 +163,11 @@ function waitForCode() {
 }
 
 async function authorize(clientId, clientSecret) {
+  // Fall back to .env if credentials weren't supplied via the UI
+  clientId     = clientId     || process.env.GOOGLE_CLIENT_ID     || '';
+  clientSecret = clientSecret || process.env.GOOGLE_CLIENT_SECRET || '';
+  if (!clientId || !clientSecret) throw new Error('No Google client credentials found. Add them to .env or enter them in the app.');
+
   setSetting('google_client_id',     clientId);
   setSetting('google_client_secret', clientSecret);
 
@@ -216,8 +221,9 @@ function buildEvent(bill) {
 
 function getStatus() {
   return {
-    connected: !!getSetting('google_refresh_token'),
-    email:     getSetting('google_user_email') || null,
+    connected:        !!getSetting('google_refresh_token'),
+    email:            getSetting('google_user_email') || null,
+    hasEnvCredentials: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
   };
 }
 

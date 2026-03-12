@@ -56,7 +56,7 @@
       s.loading      = true;
       s.bills        = [];
       s.categories   = [];
-      s.gcal         = { connected: false, email: null };
+      s.gcal         = { connected: false, email: null, hasEnvCredentials: false };
       s.error        = null;
       // Add form
       s.showAdd      = false;
@@ -146,8 +146,9 @@
 
     async connectGcal(vnode) {
       const s = vnode.state;
-      const { clientId, clientSecret } = s.gcalForm;
-      if (!clientId || !clientSecret) return;
+      const clientId     = s.gcal.hasEnvCredentials ? '' : s.gcalForm.clientId;
+      const clientSecret = s.gcal.hasEnvCredentials ? '' : s.gcalForm.clientSecret;
+      if (!s.gcal.hasEnvCredentials && (!clientId || !clientSecret)) return;
       s.gcalConnecting = true;
       s.gcalError      = null;
       m.redraw();
@@ -358,37 +359,41 @@
               !s.gcal.connected && [
                 s.showGcalSetup
                   ? m('div.gcal-setup', [
-                      m('p.section-hint', [
-                        '1. Open ',
-                        m('a.ext-link', {
-                          href: '#',
-                          onclick(e) {
-                            e.preventDefault();
-                            window.api.shell.openExternal('https://console.cloud.google.com/apis/credentials');
-                          },
-                        }, 'Google Cloud Console'),
-                        ' \u2192 select or create a project',
-                      ]),
-                      m('p.section-hint', '2. Enable the Google Calendar API \u2192 Create Credentials \u2192 OAuth client ID \u2192 Desktop app'),
-                      m('p.section-hint', '3. Paste your credentials below and click Connect:'),
-                      m('input.form-input', {
-                        placeholder: 'Client ID',
-                        value: s.gcalForm.clientId,
-                        oninput: e => { s.gcalForm.clientId = e.target.value; },
-                      }),
-                      m('input.form-input', {
-                        placeholder: 'Client Secret',
-                        type: 'password',
-                        value: s.gcalForm.clientSecret,
-                        oninput: e => { s.gcalForm.clientSecret = e.target.value; },
-                      }),
+                      s.gcal.hasEnvCredentials
+                        ? m('p.section-hint', 'Credentials loaded from .env — click Connect to authorize.')
+                        : [
+                            m('p.section-hint', [
+                              '1. Open ',
+                              m('a.ext-link', {
+                                href: '#',
+                                onclick(e) {
+                                  e.preventDefault();
+                                  window.api.shell.openExternal('https://console.cloud.google.com/apis/credentials');
+                                },
+                              }, 'Google Cloud Console'),
+                              ' \u2192 select or create a project',
+                            ]),
+                            m('p.section-hint', '2. Enable the Google Calendar API \u2192 Create Credentials \u2192 OAuth client ID \u2192 Desktop app'),
+                            m('p.section-hint', '3. Paste your credentials below and click Connect:'),
+                            m('input.form-input', {
+                              placeholder: 'Client ID',
+                              value: s.gcalForm.clientId,
+                              oninput: e => { s.gcalForm.clientId = e.target.value; },
+                            }),
+                            m('input.form-input', {
+                              placeholder: 'Client Secret',
+                              type: 'password',
+                              value: s.gcalForm.clientSecret,
+                              oninput: e => { s.gcalForm.clientSecret = e.target.value; },
+                            }),
+                          ],
                       s.gcalError && m('p.error-msg', s.gcalError),
                       m('div.form-actions', [
                         m('button.btn.btn-ghost', {
                           onclick() { s.showGcalSetup = false; s.gcalError = null; },
                         }, 'Cancel'),
                         m('button.btn.btn-primary', {
-                          disabled: !s.gcalForm.clientId || !s.gcalForm.clientSecret || s.gcalConnecting,
+                          disabled: (!s.gcal.hasEnvCredentials && (!s.gcalForm.clientId || !s.gcalForm.clientSecret)) || s.gcalConnecting,
                           onclick()  { self.connectGcal(vnode); },
                         }, s.gcalConnecting ? 'Waiting for browser…' : 'Connect'),
                       ]),

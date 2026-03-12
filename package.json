@@ -9,7 +9,8 @@
     "postinstall": "node scripts/rebuild.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2"
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
