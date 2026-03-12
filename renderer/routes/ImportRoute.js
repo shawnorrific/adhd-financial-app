@@ -116,7 +116,6 @@
             }, 'No account'),
             ...s.accounts.map(acct =>
               m('button.account-chip', {
-                key: acct.id,
                 class: s.selectedAccount?.id === acct.id ? 'active' : '',
                 style: s.selectedAccount?.id === acct.id
                   ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
@@ -141,7 +140,6 @@
           }, 'All accounts'),
           ...s.accounts.map(acct =>
             m('button.account-pill', {
-              key: acct.id,
               class: s.txAccountId === acct.id ? 'active' : '',
               style: s.txAccountId === acct.id
                 ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`

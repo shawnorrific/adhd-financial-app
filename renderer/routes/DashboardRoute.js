@@ -157,7 +157,6 @@
           }, 'All accounts'),
           ...s.accounts.map(acct =>
             m('button.account-pill', {
-              key: acct.id,
               class: s.selectedAccountId === acct.id ? 'active' : '',
               style: s.selectedAccountId === acct.id
                 ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
