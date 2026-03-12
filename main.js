@@ -226,6 +226,12 @@ ipcMain.handle('bills:delete', (_, id) => {
   return { ok: true };
 });
 
+// ── IPC: transaction delete ───────────────────────────────────────────────────
+ipcMain.handle('transactions:delete', (_, id) => {
+  db.run('DELETE FROM transactions WHERE id = ?', [id]);
+  return { ok: true };
+});
+
 // ── IPC: transaction update ───────────────────────────────────────────────────
 ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId, accountId, postDate }) => {
   db.run(

@@ -258,7 +258,7 @@
                       : m('span.muted', '—')
                   ),
 
-                  m('div.txl-col--action',
+                  m('div.txl-col--action', [
                     m('button.btn.btn-ghost.icon-btn', {
                       title:   isEditing ? 'Cancel edit' : 'Edit transaction',
                       onclick() {
@@ -266,8 +266,18 @@
                         else           { self.startEdit(vnode, tx); }
                         m.redraw();
                       },
-                    }, isEditing ? '✕' : '✎')
-                  ),
+                    }, isEditing ? '✕' : '✎'),
+                    m('button.btn.btn-ghost.icon-btn.delete-btn', {
+                      title: 'Delete transaction',
+                      async onclick() {
+                        if (!window.confirm(`Delete "${tx.description}"? This cannot be undone.`)) return;
+                        await window.api.transactions.delete(tx.id);
+                        s.txList = s.txList.filter(t => t.id !== tx.id);
+                        if (s.editingId === tx.id) { s.editingId = null; s.draft = blankDraft(); }
+                        m.redraw();
+                      },
+                    }, '\uD83D\uDDD1'),
+                  ]),
                 ]),
 
                 // ── Inline edit form ───────────────────────────────────────

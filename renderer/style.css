@@ -1122,7 +1122,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .txl-head,
 .txl-row {
   display: grid;
-  grid-template-columns: 80px 1fr 110px 160px 140px 44px;
+  grid-template-columns: 80px 1fr 110px 160px 140px 76px;
   gap: 0 12px;
   align-items: center;
   padding: 0 14px;

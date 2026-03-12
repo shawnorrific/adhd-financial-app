@@ -6,11 +6,14 @@ const { categorize, learnCorrection } = require('./categorizer');
 // ── CSV parsing ───────────────────────────────────────────────────────────────
 
 /**
- * Parse CSV text in Verity Credit Union export format.
+ * Parse CSV text in supported bank export formats.
  *
- * Expected columns (order may vary, detected by header row):
+ * Verity Credit Union columns (order may vary, detected by header row):
  *   Account Number, Post Date, Check, Description, Debit, Credit,
  *   Status, Balance, Classification
+ *
+ * Capital One columns:
+ *   Transaction Date, Posted Date, Card No., Description, Category, Debit, Credit
  *
  * @param {string} text - raw CSV file content
  * @returns {object[]} - normalised transaction objects
@@ -20,6 +23,16 @@ function parseCSV(text) {
   if (lines.length < 2) return [];
 
   const header = splitLine(lines[0]).map(h => h.trim().toLowerCase());
+
+  // Debug: log header columns and first data row so column-mapping issues are visible
+  // in the Electron main-process terminal.
+  console.log('[csv-importer] columns found:', header);
+  if (lines.length >= 2) {
+    const firstVals = splitLine(lines[1]);
+    const firstRowMap = {};
+    header.forEach((h, i) => { firstRowMap[h] = firstVals[i] ?? ''; });
+    console.log('[csv-importer] first row raw:', firstRowMap);
+  }
 
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -36,7 +49,8 @@ function parseCSV(text) {
 
     rows.push({
       accountNumber: col('account number') || null,
-      postDate:      toISO(col('post date') || col('postdate')),
+      // 'Post Date' = Verity CU  |  'Transaction Date' = Capital One
+      postDate:      toISO(col('post date') || col('postdate') || col('transaction date')),
       checkNumber:   col('check') || null,
       description:   col('description'),
       amount:        credit - debit,   // positive = money in, negative = money out
