@@ -60,4 +60,24 @@ contextBridge.exposeInMainWorld('api', {
     openExternal: url => ipcRenderer.invoke('shell:open-external', url),
   },
 
+  watcher: {
+    getPath: ()       => ipcRenderer.invoke('watcher:get-path'),
+    setPath: newPath  => ipcRenderer.invoke('watcher:set-path', newPath),
+    // Returns a cleanup function — call it in onremove to avoid listener leaks
+    onImport: cb => {
+      const fn = (_, d) => cb(d);
+      ipcRenderer.on('watcher:imported', fn);
+      return () => ipcRenderer.removeListener('watcher:imported', fn);
+    },
+    onUnrecognized: cb => {
+      const fn = (_, d) => cb(d);
+      ipcRenderer.on('watcher:unrecognized', fn);
+      return () => ipcRenderer.removeListener('watcher:unrecognized', fn);
+    },
+  },
+
+  dialog: {
+    openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
+  },
+
 });

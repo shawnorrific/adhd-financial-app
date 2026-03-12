@@ -780,6 +780,69 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   grid-column: 1 / -1;
 }
 
+/* ── Watch folder card ───────────────────────────────────────────────────── */
+.watch-folder-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.watch-folder-card .section-title { margin-bottom: 6px; }
+
+.watch-folder-hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.watch-folder-path-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.watch-folder-path-row .form-input { flex: 1; }
+
+/* ── Watch folder toast ──────────────────────────────────────────────────── */
+.watch-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  border: 1px solid;
+}
+
+.watch-toast--imported {
+  background: var(--green-dim);
+  border-color: rgba(46, 204, 113, .3);
+  color: var(--green);
+}
+
+.watch-toast--unrecognized {
+  background: rgba(241, 196, 15, .08);
+  border-color: rgba(241, 196, 15, .3);
+  color: var(--yellow);
+}
+
+.watch-toast-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.watch-toast-dismiss:hover { opacity: 1; }
+
 /* ── Import account selector ─────────────────────────────────────────────── */
 .import-account-row {
   display: flex;

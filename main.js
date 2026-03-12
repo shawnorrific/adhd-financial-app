@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog } = require('electron');
 const path = require('path');
 
 app.name = 'ADHD Finance';
@@ -12,6 +12,8 @@ let categorizer;
 let csvImporter;
 let dashboard;
 let googleCalendar;
+let folderWatcher;
+let mainWindow = null;
 
 const ICON_PATH = path.join(
   __dirname, 'assets',
@@ -19,7 +21,7 @@ const ICON_PATH = path.join(
 );
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: ICON_PATH,
@@ -30,7 +32,7 @@ function createWindow() {
     },
   });
 
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
 app.whenReady().then(() => {
@@ -47,12 +49,18 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  folderWatcher = require('./src/folder-watcher');
+  folderWatcher.start(mainWindow);
+
   if (process.platform === 'darwin' && app.dock) {
     app.dock.setIcon(ICON_PATH);
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+      folderWatcher.start(mainWindow);
+    }
   });
 });
 
@@ -271,4 +279,24 @@ ipcMain.handle('gcal:sync-all', async () => {
 ipcMain.handle('shell:open-external', (_, url) => {
   // Only allow https:// URLs to prevent abuse
   if (url.startsWith('https://')) shell.openExternal(url);
+});
+
+// ── IPC: watch folder ─────────────────────────────────────────────────────────
+ipcMain.handle('watcher:get-path', () => folderWatcher.getWatchPath());
+
+ipcMain.handle('watcher:set-path', (_, newPath) => {
+  db.run(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    ['watch_folder_path', String(newPath)]
+  );
+  folderWatcher.start(mainWindow);
+  return { ok: true };
+});
+
+ipcMain.handle('dialog:open-folder', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Watch Folder',
+    properties: ['openDirectory'],
+  });
+  return canceled ? null : filePaths[0];
 });

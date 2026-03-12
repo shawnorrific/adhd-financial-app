@@ -31,14 +31,39 @@
       s.stats           = null;
       s.error           = null;
 
+      // Watch folder state
+      s.watchInput = '';
+      s.watchSaved = false;
+      s.watchToast = null; // { type: 'imported'|'unrecognized', filename, imported?, skipped? }
+
       Promise.all([
         window.api.categories.list(),
         window.api.accounts.list(),
-      ]).then(([cats, accounts]) => {
+        window.api.watcher.getPath(),
+      ]).then(([cats, accounts, watchPath]) => {
         s.categories = cats;
         s.accounts   = accounts;
+        s.watchInput = watchPath || '';
         m.redraw();
       });
+
+      // Subscribe to background-import events; store cleanup fns for onremove
+      s._offImport = window.api.watcher.onImport(data => {
+        s.watchToast = { type: 'imported', ...data };
+        m.redraw();
+        setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
+      });
+      s._offUnrecognized = window.api.watcher.onUnrecognized(data => {
+        s.watchToast = { type: 'unrecognized', ...data };
+        m.redraw();
+        setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
+      });
+    },
+
+    onremove(vnode) {
+      const s = vnode.state;
+      if (s._offImport)       s._offImport();
+      if (s._offUnrecognized) s._offUnrecognized();
     },
 
     // Read the file with FileReader then call csv:preview over IPC
@@ -132,6 +157,48 @@
 
         m('div.import-body', [
           m('h1.page-title', 'Import Transactions'),
+
+          // ── Watch folder config ───────────────────────────────────────────
+          m('div.watch-folder-card', [
+            m('div.section-title', 'Watch Folder'),
+            m('p.watch-folder-hint',
+              'Place Verity Credit Union CSV exports here and they\'ll be imported automatically.'),
+            m('div.watch-folder-path-row', [
+              m('input.form-input[type=text]', {
+                value:       s.watchInput,
+                placeholder: '~/Downloads',
+                oninput(e)  { s.watchInput = e.target.value; },
+              }),
+              m('button.btn', {
+                async onclick() {
+                  const p = await window.api.dialog.openFolder();
+                  if (p) { s.watchInput = p; m.redraw(); }
+                },
+              }, 'Browse'),
+              m('button.btn.btn-primary', {
+                async onclick() {
+                  await window.api.watcher.setPath(s.watchInput);
+                  s.watchSaved = true;
+                  m.redraw();
+                  setTimeout(() => { s.watchSaved = false; m.redraw(); }, 2000);
+                },
+              }, s.watchSaved ? 'Saved!' : 'Save'),
+            ]),
+            s.watchToast && m('div.watch-toast', {
+              class: s.watchToast.type === 'imported'
+                ? 'watch-toast--imported'
+                : 'watch-toast--unrecognized',
+            }, [
+              s.watchToast.type === 'imported'
+                ? `Imported ${s.watchToast.imported} transaction${s.watchToast.imported !== 1 ? 's' : ''}` +
+                  (s.watchToast.skipped ? ` (${s.watchToast.skipped} duplicate${s.watchToast.skipped !== 1 ? 's' : ''} skipped)` : '') +
+                  ` from \u201c${s.watchToast.filename}\u201d.`
+                : `\u201c${s.watchToast.filename}\u201d was found but doesn\u2019t match the Verity Credit Union format.`,
+              m('button.watch-toast-dismiss', {
+                onclick() { s.watchToast = null; m.redraw(); },
+              }, '\u00d7'),
+            ]),
+          ]),
 
           // ── Account selector ─────────────────────────────────────────────
           (s.stage === 'idle' || s.stage === 'previewing') && accountSelector(),
