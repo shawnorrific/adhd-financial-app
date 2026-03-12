@@ -25,6 +25,18 @@
     return `${n} days`;
   }
 
+  /** "due today" / "due tomorrow" / "due in X days" for a monthly due_day. */
+  function billDueText(dueDay) {
+    if (!dueDay) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let next = new Date(today.getFullYear(), today.getMonth(), dueDay);
+    if (next < today) next = new Date(today.getFullYear(), today.getMonth() + 1, dueDay);
+    const days = Math.round((next - today) / 86400000);
+    if (days === 0) return 'due today';
+    if (days === 1) return 'due tomorrow';
+    return `due in ${days} days`;
+  }
+
   function monthLabel() {
     const now = new Date();
     return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]
@@ -317,7 +329,7 @@
                       ? m('span', fmtMoney(bill.amount))
                       : m('span.muted', 'variable'),
                     bill.due_day
-                      ? m('span.muted', ` \u00B7 due day\u00A0${bill.due_day}`)
+                      ? m('span.muted', ` \u00B7 ${billDueText(bill.due_day)}`)
                       : null,
                   ]),
                 ])
