@@ -881,3 +881,151 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   display: flex;
   align-items: center;
 }
+
+/* ── Mother May I — purchase checker ─────────────────────────────────────── */
+.purchase-page { display: flex; flex-direction: column; min-height: 100vh; }
+
+.purchase-body {
+  flex: 1;
+  padding: 40px 32px 64px;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.purchase-heading {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+.purchase-subheading {
+  font-size: 15px;
+  color: var(--muted);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+/* Form */
+.mmi-form        { display: flex; flex-direction: column; gap: 20px; margin-bottom: 32px; }
+.mmi-fields      { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mmi-field       { display: flex; flex-direction: column; gap: 6px; }
+
+.mmi-cost-wrap   { position: relative; display: flex; align-items: center; }
+.mmi-dollar      { position: absolute; left: 10px; color: var(--muted); font-size: 15px; pointer-events: none; }
+.mmi-cost-wrap .form-input { padding-left: 24px; }
+
+.mmi-check-btn   { align-self: flex-start; padding: 10px 28px; font-size: 15px; }
+
+/* Verdict card */
+.mmi-verdict {
+  border-radius: 16px;
+  border: 2px solid transparent;
+  padding: 28px 28px 24px;
+  animation: mmi-fade-in 0.2s ease;
+}
+
+@keyframes mmi-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mmi-verdict--safe {
+  background: rgba(46,204,113,.10);
+  border-color: rgba(46,204,113,.40);
+}
+.mmi-verdict--borderline {
+  background: rgba(241,196,15,.08);
+  border-color: rgba(241,196,15,.35);
+}
+.mmi-verdict--unsafe {
+  background: rgba(231,76,60,.10);
+  border-color: rgba(231,76,60,.35);
+}
+.mmi-verdict--unknown {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Verdict header */
+.mmi-verdict-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.mmi-verdict-icon  { font-size: 36px; line-height: 1; flex-shrink: 0; }
+
+.mmi-verdict-text  { display: flex; flex-direction: column; gap: 4px; }
+
+.mmi-verdict-item {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.mmi-verdict-title {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.mmi-verdict--safe       .mmi-verdict-title { color: var(--green); }
+.mmi-verdict--borderline .mmi-verdict-title { color: var(--yellow); }
+.mmi-verdict--unsafe     .mmi-verdict-title { color: var(--red); }
+.mmi-verdict--unknown    .mmi-verdict-title { color: var(--muted); }
+
+/* Explanation */
+.mmi-explanation {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+  margin-bottom: 20px;
+  opacity: 0.9;
+}
+
+/* Breakdown details */
+.mmi-details {
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mmi-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  gap: 12px;
+}
+
+.mmi-detail-row--sub .mmi-detail-label {
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mmi-detail-row--total {
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding-top: 6px;
+  margin-top: 2px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.mmi-detail-row--suggest {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+
+.mmi-detail-label { color: var(--muted); flex: 1; }
+.mmi-detail-value { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.mmi-debit        { color: var(--red); }
+.mmi-suggest-date { color: var(--accent); font-weight: 700; font-family: var(--font); font-size: 14px; }

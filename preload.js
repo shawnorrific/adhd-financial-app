@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('api', {
     summary: (opts) => ipcRenderer.invoke('dashboard:summary', opts),
   },
 
+  purchase: {
+    check: (itemName, cost) => ipcRenderer.invoke('purchase:check', { itemName, cost }),
+  },
+
   bills: {
     list:   (opts) => ipcRenderer.invoke('bills:list',   opts),
     detect: ()     => ipcRenderer.invoke('bills:detect'),
