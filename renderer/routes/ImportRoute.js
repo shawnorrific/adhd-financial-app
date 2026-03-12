@@ -17,6 +17,13 @@
     return n < 0 ? `\u2212$${abs}` : `+$${abs}`;
   }
 
+  // SQLite datetime is UTC "YYYY-MM-DD HH:MM:SS" — convert to local display
+  function fmtDateTime(raw) {
+    if (!raw) return '';
+    const d = new Date(raw.replace(' ', 'T') + 'Z');
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
   // ── Component ────────────────────────────────────────────────────────────────
 
   const ImportRoute = {
@@ -30,26 +37,33 @@
       s.selectedAccount = null;     // account chosen before import
       s.stats           = null;
       s.error           = null;
+      s.pendingFilename = null;     // filename of the file currently being imported
 
       // Watch folder state
       s.watchInput = '';
       s.watchSaved = false;
       s.watchToast = null; // { type: 'imported'|'unrecognized', filename, imported?, skipped? }
 
+      // Import history
+      s.batches = [];
+
       Promise.all([
         window.api.categories.list(),
         window.api.accounts.list(),
         window.api.watcher.getPath(),
-      ]).then(([cats, accounts, watchPath]) => {
+        window.api.imports.list(),
+      ]).then(([cats, accounts, watchPath, batches]) => {
         s.categories = cats;
         s.accounts   = accounts;
         s.watchInput = watchPath || '';
+        s.batches    = batches;
         m.redraw();
       });
 
       // Subscribe to background-import events; store cleanup fns for onremove
-      s._offImport = window.api.watcher.onImport(data => {
+      s._offImport = window.api.watcher.onImport(async data => {
         s.watchToast = { type: 'imported', ...data };
+        s.batches = await window.api.imports.list();
         m.redraw();
         setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
       });
@@ -77,8 +91,9 @@
         return;
       }
 
-      s.stage = 'loading';
-      s.error = null;
+      s.stage           = 'loading';
+      s.error           = null;
+      s.pendingFilename = file.name;
       m.redraw();
 
       const reader = new FileReader();
@@ -103,8 +118,9 @@
       m.redraw();
       try {
         const accountId = s.selectedAccount ? s.selectedAccount.id : null;
-        s.stats = await window.api.csv.import(s.preview, accountId);
-        s.stage = 'done';
+        s.stats   = await window.api.csv.import(s.preview, accountId, s.pendingFilename);
+        s.batches = await window.api.imports.list();
+        s.stage   = 'done';
       } catch (err) {
         s.error = err.message || String(err);
         s.stage = 'error';
@@ -282,7 +298,7 @@
             m('p.done-stat', [m('strong', s.stats.imported), ' transactions imported']),
             s.stats.skipped > 0 && m('p.done-skipped', `${s.stats.skipped} duplicate${s.stats.skipped !== 1 ? 's' : ''} skipped`),
             m('button.btn.btn-primary', {
-              onclick() { s.stage = 'idle'; s.preview = []; s.stats = null; m.redraw(); },
+              onclick() { s.stage = 'idle'; s.preview = []; s.stats = null; s.pendingFilename = null; m.redraw(); },
             }, 'Import another file'),
           ]),
 
@@ -290,8 +306,46 @@
           s.stage === 'error' && m('div.import-error', [
             m('p', `⚠\uFE0F ${s.error}`),
             m('button.btn', {
-              onclick() { s.stage = 'idle'; s.error = null; m.redraw(); },
+              onclick() { s.stage = 'idle'; s.error = null; s.pendingFilename = null; m.redraw(); },
             }, 'Try again'),
+          ]),
+
+          // ── Import history ────────────────────────────────────────────────
+          s.batches.length > 0 && m('div.import-history-section', [
+            m('div.section-title', 'Import History'),
+            m('div.import-batch-list',
+              s.batches.map(batch =>
+                m('div.import-batch-row', [
+                  m('div.import-batch-meta', [
+                    m('span.import-batch-filename', batch.filename || 'Unknown file'),
+                    m('span.import-batch-date', fmtDateTime(batch.imported_at)),
+                  ]),
+                  m('span.import-batch-count', `${batch.tx_count} tx`),
+                  m('select.cat-select.import-batch-account', {
+                    onchange(e) {
+                      const newId = e.target.value ? parseInt(e.target.value, 10) : null;
+                      batch.account_id = newId;
+                      window.api.imports.setAccount(batch.id, newId);
+                    },
+                  }, [
+                    m('option', { value: '', selected: !batch.account_id }, ''),
+                    ...s.accounts.map(acct =>
+                      m('option', { value: acct.id, selected: acct.id === batch.account_id }, acct.name)
+                    ),
+                  ]),
+                  m('button.btn.icon-btn.delete-btn', {
+                    title: `Delete all transactions from this import`,
+                    async onclick() {
+                      const label = batch.filename || 'this import';
+                      if (!window.confirm(`Delete all ${batch.tx_count} transaction${batch.tx_count !== 1 ? 's' : ''} from \u201c${label}\u201d? This cannot be undone.`)) return;
+                      await window.api.imports.delete(batch.id);
+                      s.batches = s.batches.filter(b => b.id !== batch.id);
+                      m.redraw();
+                    },
+                  }, '\uD83D\uDDD1'),
+                ])
+              )
+            ),
           ]),
 
         ]),

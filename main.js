@@ -76,8 +76,8 @@ ipcMain.handle('db:ping', () => {
 
 // ── IPC: CSV import ───────────────────────────────────────────────────────────
 ipcMain.handle('csv:preview', (_, content) => csvImporter.previewCSV(content));
-ipcMain.handle('csv:import',  (_, { rows, accountId }) =>
-  csvImporter.importRows(rows, accountId || null));
+ipcMain.handle('csv:import',  (_, { rows, accountId, filename }) =>
+  csvImporter.importRows(rows, accountId || null, filename || null));
 
 // ── IPC: transactions ─────────────────────────────────────────────────────────
 ipcMain.handle('transactions:list', (_, { limit = 200, offset = 0, accountId } = {}) => {
@@ -299,4 +299,25 @@ ipcMain.handle('dialog:open-folder', async () => {
     properties: ['openDirectory'],
   });
   return canceled ? null : filePaths[0];
+});
+
+// ── IPC: import history ───────────────────────────────────────────────────────
+ipcMain.handle('imports:list', () =>
+  db.all(`
+    SELECT b.*, a.name AS account_name, a.color AS account_color
+    FROM   import_batches b
+    LEFT JOIN accounts a ON a.id = b.account_id
+    ORDER  BY b.imported_at DESC
+  `));
+
+ipcMain.handle('imports:set-account', (_, { batchId, accountId }) => {
+  db.run('UPDATE import_batches  SET account_id = ? WHERE id = ?',           [accountId || null, batchId]);
+  db.run('UPDATE transactions    SET account_id = ? WHERE import_batch_id = ?', [accountId || null, batchId]);
+  return { ok: true };
+});
+
+ipcMain.handle('imports:delete', (_, batchId) => {
+  db.run('DELETE FROM transactions   WHERE import_batch_id = ?', [batchId]);
+  db.run('DELETE FROM import_batches WHERE id = ?',              [batchId]);
+  return { ok: true };
 });

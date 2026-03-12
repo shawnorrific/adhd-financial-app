@@ -63,7 +63,7 @@ function processFile(filePath) {
   let result;
   try {
     const rows = csvImporter.previewCSV(text);
-    result     = csvImporter.importRows(rows, null);
+    result     = csvImporter.importRows(rows, null, filename);
   } catch (err) {
     notify('ADHD Finance — Import Error', `Could not import "${filename}": ${err.message}`);
     return;

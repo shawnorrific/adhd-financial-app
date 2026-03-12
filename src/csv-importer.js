@@ -98,12 +98,21 @@ function previewCSV(text) {
 /**
  * Persist confirmed rows into the DB, associating them with the given account.
  * Saves a category_rule for any row the user manually re-categorised.
+ * Creates an import_batches record to group the rows for history tracking.
  *
- * @param {object[]} rows      - from previewCSV(), possibly with user-edited categoryId
+ * @param {object[]} rows         - from previewCSV(), possibly with user-edited categoryId
  * @param {number|null} accountId - account to associate all rows with
- * @returns {{ imported: number, skipped: number }}
+ * @param {string|null} filename  - original CSV filename, for history display
+ * @returns {{ imported: number, skipped: number, batchId: number|null }}
  */
-function importRows(rows, accountId = null) {
+function importRows(rows, accountId = null, filename = null) {
+  // Create a batch record up front so we have an id to tag transactions with
+  const batchRun = db.run(
+    'INSERT INTO import_batches (filename, account_id) VALUES (?, ?)',
+    [filename || null, accountId]
+  );
+  const batchId = batchRun.lastInsertRowid;
+
   let imported = 0;
   let skipped  = 0;
 
@@ -117,8 +126,9 @@ function importRows(rows, accountId = null) {
       db.run(`
         INSERT INTO transactions
           (account_number, post_date, check_number, description,
-           amount, status, balance, category_id, is_user_categorized, source, account_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?)
+           amount, status, balance, category_id, is_user_categorized, source, account_id,
+           import_batch_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?)
       `, [
         row.accountNumber  || null,
         row.postDate,
@@ -130,6 +140,7 @@ function importRows(rows, accountId = null) {
         row.categoryId     || null,
         row.isUserCorrected ? 1 : 0,
         accountId,
+        batchId,
       ]);
       imported++;
     } catch (e) {
@@ -141,7 +152,14 @@ function importRows(rows, accountId = null) {
     }
   }
 
-  return { imported, skipped };
+  // Nothing was inserted — remove the empty placeholder and return no batchId
+  if (imported === 0) {
+    db.run('DELETE FROM import_batches WHERE id = ?', [batchId]);
+    return { imported, skipped, batchId: null };
+  }
+
+  db.run('UPDATE import_batches SET tx_count = ? WHERE id = ?', [imported, batchId]);
+  return { imported, skipped, batchId };
 }
 
 module.exports = { previewCSV, importRows };

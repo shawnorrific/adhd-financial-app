@@ -1245,3 +1245,58 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   flex: 1;
 }
 .txl-bill-fields .txl-edit-field { min-width: 160px; }
+
+/* ── Import history ──────────────────────────────────────────────────────── */
+.import-history-section {
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  padding-top: 28px;
+}
+
+.import-history-section .section-title { margin-bottom: 14px; }
+
+.import-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.import-batch-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.import-batch-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.import-batch-filename {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-batch-date {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.import-batch-count {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.import-batch-account { width: 160px; }

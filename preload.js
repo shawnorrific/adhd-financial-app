@@ -7,8 +7,8 @@ contextBridge.exposeInMainWorld('api', {
   ping: () => ipcRenderer.invoke('db:ping'),
 
   csv: {
-    preview: content            => ipcRenderer.invoke('csv:preview', content),
-    import:  (rows, accountId)  => ipcRenderer.invoke('csv:import',  { rows, accountId }),
+    preview: content                      => ipcRenderer.invoke('csv:preview', content),
+    import:  (rows, accountId, filename)  => ipcRenderer.invoke('csv:import',  { rows, accountId, filename }),
   },
 
   transactions: {
@@ -78,6 +78,12 @@ contextBridge.exposeInMainWorld('api', {
 
   dialog: {
     openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
+  },
+
+  imports: {
+    list:       ()                   => ipcRenderer.invoke('imports:list'),
+    setAccount: (batchId, accountId) => ipcRenderer.invoke('imports:set-account', { batchId, accountId }),
+    delete:     batchId              => ipcRenderer.invoke('imports:delete', batchId),
   },
 
 });
