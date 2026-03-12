@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 
 // All modules that touch the DB are required inside app.whenReady() so that
@@ -8,6 +8,7 @@ let runMigrations;
 let categorizer;
 let csvImporter;
 let dashboard;
+let googleCalendar;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -29,9 +30,10 @@ app.whenReady().then(() => {
   runMigrations();
 
   // Require after migrations so all tables exist
-  categorizer  = require('./src/categorizer');
-  csvImporter  = require('./src/csv-importer');
-  dashboard    = require('./src/dashboard');
+  categorizer     = require('./src/categorizer');
+  csvImporter     = require('./src/csv-importer');
+  dashboard       = require('./src/dashboard');
+  googleCalendar  = require('./src/google-calendar');
 
   createWindow();
 
@@ -84,7 +86,13 @@ ipcMain.handle('dashboard:summary', () => dashboard.getSummary());
 
 // ── IPC: bills ────────────────────────────────────────────────────────────────
 ipcMain.handle('bills:list', () =>
-  db.all('SELECT * FROM bills WHERE is_active = 1 ORDER BY due_day, name'));
+  db.all(`
+    SELECT b.*, c.name AS category_name
+    FROM   bills b
+    LEFT JOIN categories c ON c.id = b.category_id
+    WHERE  b.is_active = 1
+    ORDER  BY b.due_day, b.name
+  `));
 
 ipcMain.handle('bills:detect', () =>
   db.all(`
@@ -111,15 +119,20 @@ ipcMain.handle('bills:detect', () =>
 ipcMain.handle('bills:save', (_, bill) => {
   if (bill.id) {
     db.run(
-      'UPDATE bills SET name=?, amount=?, due_day=?, category_id=?, is_active=? WHERE id=?',
-      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null, bill.is_active ?? 1, bill.id]
+      'UPDATE bills SET name=?, amount=?, due_day=?, category_id=?, notes=? WHERE id=?',
+      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null, bill.notes ?? null, bill.id]
     );
   } else {
     db.run(
-      'INSERT INTO bills (name, amount, due_day, category_id) VALUES (?, ?, ?, ?)',
-      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null]
+      'INSERT INTO bills (name, amount, due_day, category_id, notes) VALUES (?, ?, ?, ?, ?)',
+      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null, bill.notes ?? null]
     );
   }
+  return { ok: true };
+});
+
+ipcMain.handle('bills:delete', (_, id) => {
+  db.run('UPDATE bills SET is_active = 0 WHERE id = ?', [id]);
   return { ok: true };
 });
 
@@ -133,4 +146,35 @@ ipcMain.handle('settings:set', (_, { key, value }) => {
     [key, String(value)]
   );
   return { ok: true };
+});
+
+// ── IPC: Google Calendar ──────────────────────────────────────────────────────
+ipcMain.handle('gcal:status', () => googleCalendar.getStatus());
+
+ipcMain.handle('gcal:authorize', async (_, { clientId, clientSecret }) => {
+  try   { return await googleCalendar.authorize(clientId, clientSecret); }
+  catch (err) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('gcal:disconnect', () => googleCalendar.disconnect());
+
+ipcMain.handle('gcal:sync-bill', async (_, billId) => {
+  try   { return await googleCalendar.syncBill(billId); }
+  catch (err) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('gcal:unsync-bill', async (_, billId) => {
+  try   { return await googleCalendar.unsyncBill(billId); }
+  catch (err) { return { ok: false, error: err.message }; }
+});
+
+ipcMain.handle('gcal:sync-all', async () => {
+  try   { return await googleCalendar.syncAll(); }
+  catch (err) { return { ok: false, error: err.message }; }
+});
+
+// ── IPC: shell utilities ──────────────────────────────────────────────────────
+ipcMain.handle('shell:open-external', (_, url) => {
+  // Only allow https:// URLs to prevent abuse
+  if (url.startsWith('https://')) shell.openExternal(url);
 });

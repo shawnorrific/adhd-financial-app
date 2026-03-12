@@ -29,6 +29,7 @@ const TestRoute = {
       m('nav.app-nav', [
         m('span.nav-logo', 'ADHD Finance'),
         m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
+        m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
         m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
         m(m.route.Link, { href: '/test',      class: 'nav-link active' }, 'Stack Check'),
       ]),
@@ -54,6 +55,7 @@ const TestRoute = {
 // ─── Router ───────────────────────────────────────────────────────────────────
 m.route(document.getElementById('app'), '/dashboard', {
   '/dashboard': window.Routes.Dashboard,
+  '/bills':     window.Routes.Bills,
   '/import':    window.Routes.Import,
   '/test':      TestRoute,
 });

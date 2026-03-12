@@ -4,7 +4,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Nothing else from Node/Electron leaks through contextIsolation.
 contextBridge.exposeInMainWorld('api', {
 
-  // Health check
   ping: () => ipcRenderer.invoke('db:ping'),
 
   csv: {
@@ -28,12 +27,26 @@ contextBridge.exposeInMainWorld('api', {
   bills: {
     list:   ()     => ipcRenderer.invoke('bills:list'),
     detect: ()     => ipcRenderer.invoke('bills:detect'),
-    save:   bill   => ipcRenderer.invoke('bills:save', bill),
+    save:   bill   => ipcRenderer.invoke('bills:save',   bill),
+    delete: id     => ipcRenderer.invoke('bills:delete', id),
   },
 
   settings: {
     get: key          => ipcRenderer.invoke('settings:get', key),
     set: (key, value) => ipcRenderer.invoke('settings:set', { key, value }),
+  },
+
+  gcal: {
+    status:     ()                     => ipcRenderer.invoke('gcal:status'),
+    authorize:  ({ clientId, clientSecret }) => ipcRenderer.invoke('gcal:authorize', { clientId, clientSecret }),
+    disconnect: ()                     => ipcRenderer.invoke('gcal:disconnect'),
+    syncBill:   billId                 => ipcRenderer.invoke('gcal:sync-bill',   billId),
+    unsyncBill: billId                 => ipcRenderer.invoke('gcal:unsync-bill', billId),
+    syncAll:    ()                     => ipcRenderer.invoke('gcal:sync-all'),
+  },
+
+  shell: {
+    openExternal: url => ipcRenderer.invoke('shell:open-external', url),
   },
 
 });

@@ -90,6 +90,7 @@
         m('nav.app-nav', [
           m('span.nav-logo', 'ADHD Finance'),
           m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
+          m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link active' }, 'Import CSV'),
           m(m.route.Link, { href: '/test',      class: 'nav-link' }, 'Stack Check'),
         ]),
