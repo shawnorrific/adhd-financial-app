@@ -7,8 +7,8 @@ contextBridge.exposeInMainWorld('api', {
   ping: () => ipcRenderer.invoke('db:ping'),
 
   csv: {
-    preview: content => ipcRenderer.invoke('csv:preview', content),
-    import:  rows    => ipcRenderer.invoke('csv:import',  rows),
+    preview: content            => ipcRenderer.invoke('csv:preview', content),
+    import:  (rows, accountId)  => ipcRenderer.invoke('csv:import',  { rows, accountId }),
   },
 
   transactions: {
@@ -20,12 +20,18 @@ contextBridge.exposeInMainWorld('api', {
     list: () => ipcRenderer.invoke('categories:list'),
   },
 
+  accounts: {
+    list:   ()        => ipcRenderer.invoke('accounts:list'),
+    save:   account   => ipcRenderer.invoke('accounts:save',   account),
+    delete: id        => ipcRenderer.invoke('accounts:delete', id),
+  },
+
   dashboard: {
-    summary: () => ipcRenderer.invoke('dashboard:summary'),
+    summary: (opts) => ipcRenderer.invoke('dashboard:summary', opts),
   },
 
   bills: {
-    list:   ()     => ipcRenderer.invoke('bills:list'),
+    list:   (opts) => ipcRenderer.invoke('bills:list',   opts),
     detect: ()     => ipcRenderer.invoke('bills:detect'),
     save:   bill   => ipcRenderer.invoke('bills:save',   bill),
     delete: id     => ipcRenderer.invoke('bills:delete', id),

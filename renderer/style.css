@@ -594,3 +594,290 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   text-align: center;
   color: var(--red);
 }
+
+/* ── Accounts page ───────────────────────────────────────────────────────── */
+.accounts-page { display: flex; flex-direction: column; min-height: 100vh; }
+
+.accounts-body {
+  flex: 1;
+  padding: 28px 32px 48px;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.account-form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr auto;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: end;
+}
+
+.color-field { display: flex; flex-direction: column; gap: 4px; }
+
+.color-picker {
+  width: 48px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--surface2);
+  cursor: pointer;
+}
+
+/* ── Account dot (color indicator) ──────────────────────────────────────── */
+.account-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.account-dot.dot-sm { width: 8px; height: 8px; margin-right: 5px; }
+.account-dot.dot-xs { width: 6px; height: 6px; margin-right: 4px; }
+
+/* ── Account type badge ──────────────────────────────────────────────────── */
+.account-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid;
+  margin-left: 8px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.account-type-badge.badge-sm {
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
+/* ── Account card name (dot + text) ─────────────────────────────────────── */
+.account-card-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* ── Account filter pill row ─────────────────────────────────────────────── */
+.account-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.account-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.account-pill:hover { background: var(--surface2); color: var(--text); }
+.account-pill.active {
+  background: var(--surface2);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.account-pill.manage-pill { color: var(--muted); font-size: 12px; margin-left: auto; }
+.account-pill.manage-pill:hover { color: var(--text); }
+
+.pill-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pill-type {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
+/* ── Account balance strip (all-accounts dashboard view) ─────────────────── */
+.account-balance-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.acct-balance-card {
+  background: var(--surface2);
+  border-radius: 8px;
+  border-left: 4px solid var(--border);
+  padding: 12px 14px;
+}
+
+.acct-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.acct-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acct-type-chip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+  border: 1px solid;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.acct-card-balance {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--mono);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.acct-card-date {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* Wide stat card (all-account balance strip) */
+.stat-card--wide {
+  grid-column: 1 / -1;
+}
+
+/* ── Import account selector ─────────────────────────────────────────────── */
+.import-account-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.import-account-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.account-chip-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.account-chip:hover { background: var(--surface2); color: var(--text); }
+.account-chip.active { background: var(--surface2); }
+
+/* ── Transaction history section ─────────────────────────────────────────── */
+.tx-history-section {
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  padding-top: 28px;
+}
+
+.tx-history-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tx-history-header .section-title { margin-bottom: 0; }
+.tx-history-header .account-filter-row {
+  padding: 0;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+/* ── Bills form 5-col grid ───────────────────────────────────────────────── */
+.bill-form-grid--5col {
+  grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr;
+}
+
+/* ── Accounts legend ─────────────────────────────────────────────────────── */
+.accounts-legend {
+  margin-top: 32px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.legend-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Bill row info wrapper (dot + name) ──────────────────────────────────── */
+.bill-info {
+  display: flex;
+  align-items: center;
+}

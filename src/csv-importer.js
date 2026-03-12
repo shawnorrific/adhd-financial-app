@@ -96,13 +96,14 @@ function previewCSV(text) {
 // ── Import ────────────────────────────────────────────────────────────────────
 
 /**
- * Persist confirmed rows into the DB.
+ * Persist confirmed rows into the DB, associating them with the given account.
  * Saves a category_rule for any row the user manually re-categorised.
  *
- * @param {object[]} rows - from previewCSV(), possibly with user-edited categoryId
+ * @param {object[]} rows      - from previewCSV(), possibly with user-edited categoryId
+ * @param {number|null} accountId - account to associate all rows with
  * @returns {{ imported: number, skipped: number }}
  */
-function importRows(rows) {
+function importRows(rows, accountId = null) {
   let imported = 0;
   let skipped  = 0;
 
@@ -116,8 +117,8 @@ function importRows(rows) {
       db.run(`
         INSERT INTO transactions
           (account_number, post_date, check_number, description,
-           amount, status, balance, category_id, is_user_categorized, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv')
+           amount, status, balance, category_id, is_user_categorized, source, account_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?)
       `, [
         row.accountNumber  || null,
         row.postDate,
@@ -128,6 +129,7 @@ function importRows(rows) {
         row.balance        ?? null,
         row.categoryId     || null,
         row.isUserCorrected ? 1 : 0,
+        accountId,
       ]);
       imported++;
     } catch (e) {

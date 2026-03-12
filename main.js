@@ -67,14 +67,29 @@ ipcMain.handle('db:ping', () => {
 
 // ── IPC: CSV import ───────────────────────────────────────────────────────────
 ipcMain.handle('csv:preview', (_, content) => csvImporter.previewCSV(content));
-ipcMain.handle('csv:import',  (_, rows)    => csvImporter.importRows(rows));
+ipcMain.handle('csv:import',  (_, { rows, accountId }) =>
+  csvImporter.importRows(rows, accountId || null));
 
 // ── IPC: transactions ─────────────────────────────────────────────────────────
-ipcMain.handle('transactions:list', (_, { limit = 200, offset = 0 } = {}) => {
+ipcMain.handle('transactions:list', (_, { limit = 200, offset = 0, accountId } = {}) => {
+  if (accountId) {
+    return db.all(`
+      SELECT t.*, c.name AS category_name, c.is_impulse,
+             a.name AS account_name, a.color AS account_color, a.type AS account_type
+      FROM   transactions t
+      LEFT JOIN categories c ON c.id = t.category_id
+      LEFT JOIN accounts   a ON a.id = t.account_id
+      WHERE  t.account_id = ?
+      ORDER  BY t.post_date DESC, t.id DESC
+      LIMIT  ? OFFSET ?
+    `, [accountId, limit, offset]);
+  }
   return db.all(`
-    SELECT t.*, c.name AS category_name, c.is_impulse
+    SELECT t.*, c.name AS category_name, c.is_impulse,
+           a.name AS account_name, a.color AS account_color, a.type AS account_type
     FROM   transactions t
     LEFT JOIN categories c ON c.id = t.category_id
+    LEFT JOIN accounts   a ON a.id = t.account_id
     ORDER  BY t.post_date DESC, t.id DESC
     LIMIT  ? OFFSET ?
   `, [limit, offset]);
@@ -94,18 +109,63 @@ ipcMain.handle('transaction:recategorize', (_, { id, categoryId }) => {
 ipcMain.handle('categories:list', () =>
   db.all('SELECT * FROM categories ORDER BY name'));
 
+// ── IPC: accounts ─────────────────────────────────────────────────────────────
+ipcMain.handle('accounts:list', () =>
+  db.all('SELECT * FROM accounts ORDER BY id'));
+
+ipcMain.handle('accounts:save', (_, account) => {
+  if (account.id) {
+    db.run(
+      'UPDATE accounts SET name=?, type=?, color=?, institution=? WHERE id=?',
+      [account.name, account.type, account.color,
+       account.institution || null, account.id]
+    );
+  } else {
+    db.run(
+      'INSERT INTO accounts (name, type, color, institution) VALUES (?, ?, ?, ?)',
+      [account.name, account.type, account.color, account.institution || null]
+    );
+  }
+  return { ok: true };
+});
+
+ipcMain.handle('accounts:delete', (_, id) => {
+  const used = db.get(
+    'SELECT COUNT(*) AS n FROM transactions WHERE account_id = ?', [id]);
+  if (used.n > 0) {
+    return { ok: false, error: `${used.n} transaction(s) are linked to this account` };
+  }
+  db.run('DELETE FROM accounts WHERE id = ?', [id]);
+  return { ok: true };
+});
+
 // ── IPC: dashboard ────────────────────────────────────────────────────────────
-ipcMain.handle('dashboard:summary', () => dashboard.getSummary());
+ipcMain.handle('dashboard:summary', (_, { accountId } = {}) =>
+  dashboard.getSummary(accountId || null));
 
 // ── IPC: bills ────────────────────────────────────────────────────────────────
-ipcMain.handle('bills:list', () =>
-  db.all(`
-    SELECT b.*, c.name AS category_name
+ipcMain.handle('bills:list', (_, { accountId } = {}) => {
+  if (accountId) {
+    return db.all(`
+      SELECT b.*, c.name AS category_name,
+             a.name AS account_name, a.color AS account_color
+      FROM   bills b
+      LEFT JOIN categories c ON c.id = b.category_id
+      LEFT JOIN accounts   a ON a.id = b.account_id
+      WHERE  b.is_active = 1 AND b.account_id = ?
+      ORDER  BY b.due_day, b.name
+    `, [accountId]);
+  }
+  return db.all(`
+    SELECT b.*, c.name AS category_name,
+           a.name AS account_name, a.color AS account_color
     FROM   bills b
     LEFT JOIN categories c ON c.id = b.category_id
+    LEFT JOIN accounts   a ON a.id = b.account_id
     WHERE  b.is_active = 1
     ORDER  BY b.due_day, b.name
-  `));
+  `);
+});
 
 ipcMain.handle('bills:detect', () =>
   db.all(`
@@ -132,13 +192,17 @@ ipcMain.handle('bills:detect', () =>
 ipcMain.handle('bills:save', (_, bill) => {
   if (bill.id) {
     db.run(
-      'UPDATE bills SET name=?, amount=?, due_day=?, category_id=?, notes=? WHERE id=?',
-      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null, bill.notes ?? null, bill.id]
+      'UPDATE bills SET name=?, amount=?, due_day=?, category_id=?, notes=?, account_id=? WHERE id=?',
+      [bill.name, bill.amount ?? null, bill.due_day ?? null,
+       bill.category_id ?? null, bill.notes ?? null,
+       bill.account_id ?? null, bill.id]
     );
   } else {
     db.run(
-      'INSERT INTO bills (name, amount, due_day, category_id, notes) VALUES (?, ?, ?, ?, ?)',
-      [bill.name, bill.amount ?? null, bill.due_day ?? null, bill.category_id ?? null, bill.notes ?? null]
+      'INSERT INTO bills (name, amount, due_day, category_id, notes, account_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [bill.name, bill.amount ?? null, bill.due_day ?? null,
+       bill.category_id ?? null, bill.notes ?? null,
+       bill.account_id ?? null]
     );
   }
   return { ok: true };

@@ -22,22 +22,31 @@
     return `due in ${days} days`;
   }
 
+  const TYPE_LABELS = {
+    checking:    'Checking',
+    credit_card: 'Credit Card',
+    bnpl:        'BNPL (Affirm)',
+  };
+
   function defaultForm() {
-    return { name: '', amount: '', dueDay: '', categoryId: '', notes: '' };
+    return { name: '', amount: '', dueDay: '', categoryId: '', notes: '', accountId: '' };
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
   function loadData(vnode) {
     const s = vnode.state;
+    const accountId = s.selectedAccountId || null;
     Promise.all([
-      window.api.bills.list(),
+      window.api.bills.list({ accountId }),
       window.api.categories.list(),
       window.api.gcal.status(),
-    ]).then(([bills, categories, gcal]) => {
+      window.api.accounts.list(),
+    ]).then(([bills, categories, gcal, accounts]) => {
       s.bills      = bills;
       s.categories = categories;
       s.gcal       = gcal;
+      s.accounts   = accounts;
       s.loading    = false;
       m.redraw();
     }).catch(err => {
@@ -56,8 +65,10 @@
       s.loading      = true;
       s.bills        = [];
       s.categories   = [];
+      s.accounts     = [];
       s.gcal         = { connected: false, email: null, hasEnvCredentials: false };
       s.error        = null;
+      s.selectedAccountId = null;
       // Add form
       s.showAdd      = false;
       s.addForm      = defaultForm();
@@ -85,9 +96,10 @@
       m.redraw();
       await window.api.bills.save({
         name:        f.name.trim(),
-        amount:      f.amount  ? parseFloat(f.amount)   : null,
-        due_day:     f.dueDay  ? parseInt(f.dueDay, 10) : null,
-        category_id: f.categoryId ? parseInt(f.categoryId, 10) : null,
+        amount:      f.amount     ? parseFloat(f.amount)          : null,
+        due_day:     f.dueDay     ? parseInt(f.dueDay, 10)        : null,
+        category_id: f.categoryId ? parseInt(f.categoryId, 10)    : null,
+        account_id:  f.accountId  ? parseInt(f.accountId, 10)     : null,
         notes:       f.notes.trim() || null,
       });
       s.addSaving = false;
@@ -101,9 +113,10 @@
       s.editId   = bill.id;
       s.editForm = {
         name:       bill.name,
-        amount:     bill.amount  != null ? String(bill.amount)  : '',
-        dueDay:     bill.due_day != null ? String(bill.due_day) : '',
+        amount:     bill.amount      != null ? String(bill.amount)      : '',
+        dueDay:     bill.due_day     != null ? String(bill.due_day)     : '',
         categoryId: bill.category_id != null ? String(bill.category_id) : '',
+        accountId:  bill.account_id  != null ? String(bill.account_id)  : '',
         notes:      bill.notes || '',
       };
     },
@@ -117,9 +130,10 @@
       await window.api.bills.save({
         id:          s.editId,
         name:        f.name.trim(),
-        amount:      f.amount  ? parseFloat(f.amount)   : null,
-        due_day:     f.dueDay  ? parseInt(f.dueDay, 10) : null,
-        category_id: f.categoryId ? parseInt(f.categoryId, 10) : null,
+        amount:      f.amount     ? parseFloat(f.amount)          : null,
+        due_day:     f.dueDay     ? parseInt(f.dueDay, 10)        : null,
+        category_id: f.categoryId ? parseInt(f.categoryId, 10)    : null,
+        account_id:  f.accountId  ? parseInt(f.accountId, 10)     : null,
         notes:       f.notes.trim() || null,
       });
       s.editSaving = false;
@@ -190,6 +204,36 @@
         ...s.categories.map(c => m('option', { value: c.id }, c.name)),
       ];
 
+      const acctOptions = [
+        m('option', { value: '' }, '— Account (optional) —'),
+        ...s.accounts.map(a => m('option', { value: a.id }, a.name)),
+      ];
+
+      // ── Account filter pills ─────────────────────────────────────────────
+      function accountPills() {
+        if (!s.accounts.length) return null;
+        return m('div.account-filter-row', [
+          m('button.account-pill', {
+            class: s.selectedAccountId === null ? 'active' : '',
+            onclick() { s.selectedAccountId = null; loadData(vnode); },
+          }, 'All accounts'),
+          ...s.accounts.map(acct =>
+            m('button.account-pill', {
+              key: acct.id,
+              class: s.selectedAccountId === acct.id ? 'active' : '',
+              style: s.selectedAccountId === acct.id
+                ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
+                : `border-color:${acct.color}40; color:${acct.color}`,
+              onclick() { s.selectedAccountId = acct.id; loadData(vnode); },
+            }, [
+              m('span.pill-dot', { style: `background:${acct.color}` }),
+              acct.name,
+              m('span.pill-type', TYPE_LABELS[acct.type] || acct.type),
+            ])
+          ),
+        ]);
+      }
+
       return m('div.bills-page', [
 
         // ── Nav ────────────────────────────────────────────────────────────
@@ -198,10 +242,13 @@
           m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link active' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
-          m(m.route.Link, { href: '/test',      class: 'nav-link' }, 'Stack Check'),
+          m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
         ]),
 
         m('div.bills-body', [
+
+          // ── Account filter ───────────────────────────────────────────────
+          accountPills(),
 
           s.loading && m('p.status-msg', '⏳ Loading…'),
           s.error   && m('p.error-msg', `⚠️ ${s.error}`),
@@ -218,7 +265,7 @@
 
             // ── Add bill form ─────────────────────────────────────────────
             s.showAdd && m('div.bill-form-card', [
-              m('div.bill-form-grid', [
+              m('div.bill-form-grid.bill-form-grid--5col', [
                 m('input.form-input', {
                   placeholder: 'Bill name *',
                   value: s.addForm.name,
@@ -238,6 +285,10 @@
                   value: s.addForm.categoryId,
                   onchange: e => { s.addForm.categoryId = e.target.value; },
                 }, catOptions),
+                m('select.cat-select', {
+                  value: s.addForm.accountId,
+                  onchange: e => { s.addForm.accountId = e.target.value; },
+                }, acctOptions),
               ]),
               m('div.form-actions', [
                 m('button.btn.btn-ghost', {
@@ -264,7 +315,7 @@
 
                     // ── Edit mode ─────────────────────────────────────────
                     ? [
-                        m('div.bill-form-grid', [
+                        m('div.bill-form-grid.bill-form-grid--5col', [
                           m('input.form-input', {
                             value: s.editForm.name,
                             oninput: e => { s.editForm.name = e.target.value; },
@@ -283,6 +334,10 @@
                             value: s.editForm.categoryId,
                             onchange: e => { s.editForm.categoryId = e.target.value; },
                           }, catOptions),
+                          m('select.cat-select', {
+                            value: s.editForm.accountId,
+                            onchange: e => { s.editForm.accountId = e.target.value; },
+                          }, acctOptions),
                         ]),
                         m('div.form-actions', [
                           m('button.btn.btn-ghost', {
@@ -298,7 +353,12 @@
                     // ── View mode ─────────────────────────────────────────
                     : [
                         m('div.bill-card-main', [
-                          m('div.bill-card-name', bill.name),
+                          m('div.bill-card-name', [
+                            bill.account_color && m('span.account-dot.dot-sm', {
+                              style: `background:${bill.account_color}`,
+                            }),
+                            bill.name,
+                          ]),
                           m('div.bill-card-meta', [
                             bill.amount
                               ? m('span.bill-amount', fmtMoney(bill.amount))
@@ -308,6 +368,11 @@
                               : m('span.muted', ' \u00B7 no due day'),
                             bill.category_name
                               ? m('span.bill-cat', ` \u00B7 ${bill.category_name}`)
+                              : null,
+                            bill.account_name
+                              ? m('span.account-type-badge.badge-sm', {
+                                  style: `color:${bill.account_color}; border-color:${bill.account_color}40`,
+                                }, bill.account_name)
                               : null,
                           ]),
                         ]),

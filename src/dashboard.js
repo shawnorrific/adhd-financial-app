@@ -71,19 +71,41 @@ function nextDueInfo(dueDay, todayISO) {
 
 /**
  * Return everything the Dashboard component needs in one round-trip.
+ * When accountId is provided, financial data is filtered to that account.
+ *
+ * @param {number|null} accountId
  */
-function getSummary() {
+function getSummary(accountId = null) {
   const today = toISO(new Date());
   const monthStart = today.substring(0, 7) + '-01';
+
+  const acctWhere  = accountId ? 'AND account_id = ?' : '';
+  const acctParam  = accountId ? [accountId]          : [];
+
+  // ── Per-account balances (always returned for the account strip) ────────────
+  const accountBalances = db.all(`
+    SELECT a.id, a.name, a.type, a.color,
+           t.balance AS latest_balance, t.post_date AS balance_date
+    FROM   accounts a
+    LEFT JOIN (
+      SELECT account_id, balance, post_date
+      FROM   transactions
+      WHERE  balance IS NOT NULL
+      GROUP  BY account_id
+      HAVING post_date = MAX(post_date)
+    ) t ON t.account_id = a.id
+    ORDER BY a.id
+  `);
 
   // ── Balance ────────────────────────────────────────────────────────────────
   const latestTx = db.get(`
     SELECT balance, post_date
     FROM   transactions
     WHERE  balance IS NOT NULL
+    ${acctWhere}
     ORDER  BY post_date DESC, id DESC
     LIMIT  1
-  `);
+  `, acctParam);
   const balance = latestTx?.balance ?? null;
 
   // ── Paycheck ───────────────────────────────────────────────────────────────
@@ -100,7 +122,13 @@ function getSummary() {
   }
 
   // ── Bills ──────────────────────────────────────────────────────────────────
-  const bills = db.all('SELECT * FROM bills WHERE is_active = 1 AND due_day IS NOT NULL ORDER BY due_day');
+  const billsWhere = accountId
+    ? 'WHERE is_active = 1 AND due_day IS NOT NULL AND (account_id = ? OR account_id IS NULL)'
+    : 'WHERE is_active = 1 AND due_day IS NOT NULL';
+  const bills = db.all(
+    `SELECT * FROM bills ${billsWhere} ORDER BY due_day`,
+    accountId ? [accountId] : []
+  );
 
   // Next upcoming bill (the soonest one from today)
   let nextBill          = null;
@@ -161,27 +189,31 @@ function getSummary() {
     SELECT COALESCE(SUM(ABS(amount)), 0) AS total
     FROM   transactions
     WHERE  amount < 0 AND post_date >= ?
-  `, [monthStart])?.total || 0;
+    ${acctWhere}
+  `, [monthStart, ...acctParam])?.total || 0;
 
   const monthlyIncome = db.get(`
     SELECT COALESCE(SUM(amount), 0) AS total
     FROM   transactions
     WHERE  amount > 0 AND post_date >= ?
-  `, [monthStart])?.total || 0;
+    ${acctWhere}
+  `, [monthStart, ...acctParam])?.total || 0;
 
   const topCategories = db.all(`
     SELECT c.name, c.is_impulse, COALESCE(SUM(ABS(t.amount)), 0) AS total
     FROM   transactions t
     LEFT JOIN categories c ON c.id = t.category_id
     WHERE  t.amount < 0 AND t.post_date >= ?
+    ${acctWhere}
     GROUP  BY t.category_id
     ORDER  BY total DESC
     LIMIT  8
-  `, [monthStart]);
+  `, [monthStart, ...acctParam]);
 
   return {
     balance,
     balanceDate:        latestTx?.post_date ?? null,
+    accountBalances,
     paycheckFrequency,
     paycheckLastDate,
     nextPaycheckDate,

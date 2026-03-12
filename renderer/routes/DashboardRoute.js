@@ -43,6 +43,12 @@
       + ' ' + now.getFullYear();
   }
 
+  const TYPE_LABELS = {
+    checking:    'Checking',
+    credit_card: 'Credit Card',
+    bnpl:        'BNPL (Affirm)',
+  };
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   function loadData(vnode, { silent = false } = {}) {
@@ -52,12 +58,16 @@
       m.redraw();
     }
 
+    const accountId = s.selectedAccountId || null;
+
     Promise.all([
-      window.api.dashboard.summary(),
-      window.api.bills.list(),
-    ]).then(([summary, bills]) => {
+      window.api.dashboard.summary({ accountId }),
+      window.api.bills.list({ accountId }),
+      window.api.accounts.list(),
+    ]).then(([summary, bills, accounts]) => {
       s.summary  = summary;
       s.bills    = bills;
+      s.accounts = accounts;
       s.loading  = false;
 
       // Always detect recurring charges so the list stays available for adding more
@@ -87,8 +97,10 @@
       s.loading  = true;
       s.summary  = null;
       s.bills    = [];
+      s.accounts = [];
       s.detected = null;
       s.error    = null;
+      s.selectedAccountId = null;  // null = all accounts
       // Paycheck setup form state
       s.pf = { open: false, frequency: 'biweekly', lastDate: '', saving: false };
       loadData(vnode);
@@ -132,6 +144,60 @@
       };
       const sc = STATUS[sum?.status ?? 'unknown'];
 
+      // ── Account filter pills ─────────────────────────────────────────────
+      function accountPills() {
+        if (!s.accounts.length) return null;
+        return m('div.account-filter-row', [
+          m('button.account-pill', {
+            class: s.selectedAccountId === null ? 'active' : '',
+            onclick() {
+              s.selectedAccountId = null;
+              loadData(vnode);
+            },
+          }, 'All accounts'),
+          ...s.accounts.map(acct =>
+            m('button.account-pill', {
+              key: acct.id,
+              class: s.selectedAccountId === acct.id ? 'active' : '',
+              style: s.selectedAccountId === acct.id
+                ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
+                : `border-color:${acct.color}40; color:${acct.color}`,
+              onclick() {
+                s.selectedAccountId = acct.id;
+                loadData(vnode);
+              },
+            }, [
+              m('span.pill-dot', { style: `background:${acct.color}` }),
+              acct.name,
+              m('span.pill-type', TYPE_LABELS[acct.type] || acct.type),
+            ])
+          ),
+          m(m.route.Link, { href: '/accounts', class: 'account-pill manage-pill' }, '⚙ Manage'),
+        ]);
+      }
+
+      // ── Per-account balance cards (all-accounts view) ────────────────────
+      function accountBalanceCards() {
+        const balances = sum?.accountBalances?.filter(a => a.latest_balance != null);
+        if (!balances?.length) return null;
+        return m('div.account-balance-strip', balances.map(acct =>
+          m('div.acct-balance-card', {
+            key: acct.id,
+            style: `border-left: 4px solid ${acct.color}`,
+          }, [
+            m('div.acct-card-header', [
+              m('span.account-dot', { style: `background:${acct.color}` }),
+              m('span.acct-card-name', acct.name),
+              m('span.acct-type-chip', {
+                style: `color:${acct.color}; border-color:${acct.color}40`,
+              }, TYPE_LABELS[acct.type] || acct.type),
+            ]),
+            m('div.acct-card-balance', fmtMoney(acct.latest_balance)),
+            acct.balance_date && m('div.acct-card-date', `as of ${fmtDate(acct.balance_date)}`),
+          ])
+        ));
+      }
+
       return m('div.dashboard-page', [
 
         // ── Nav ──────────────────────────────────────────────────────────────
@@ -140,10 +206,13 @@
           m(m.route.Link, { href: '/dashboard', class: 'nav-link active' }, 'Dashboard'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
-          m(m.route.Link, { href: '/test',      class: 'nav-link' }, 'Stack Check'),
+          m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
         ]),
 
         m('div.dashboard-body', [
+
+          // ── Account filter ───────────────────────────────────────────────
+          accountPills(),
 
           s.loading && m('p.status-msg', '⏳ Loading…'),
           s.error   && m('p.error-msg', `⚠️ ${s.error}`),
@@ -181,13 +250,23 @@
             // ── Stat cards ──────────────────────────────────────────────────
             m('div.stat-cards', [
 
-              // Balance
-              m('div.stat-card', [
-                m('div.card-label', 'Balance'),
-                m('div.card-value', sum.balance != null ? fmtMoney(sum.balance) : '—'),
-                m('div.card-sub',
-                  sum.balanceDate ? `as of ${fmtDate(sum.balanceDate)}` : 'import a CSV to start'),
-              ]),
+              // Balance — single account shows one card; all accounts shows per-account strip
+              s.selectedAccountId
+                ? m('div.stat-card', [
+                    m('div.card-label', 'Balance'),
+                    m('div.card-value', sum.balance != null ? fmtMoney(sum.balance) : '—'),
+                    m('div.card-sub',
+                      sum.balanceDate ? `as of ${fmtDate(sum.balanceDate)}` : 'import a CSV to start'),
+                  ])
+                : m('div.stat-card.stat-card--wide', [
+                    m('div.card-label', 'Balances'),
+                    accountBalanceCards() ||
+                      m('div.card-value.muted', sum.balance != null ? fmtMoney(sum.balance) : '—'),
+                    !accountBalanceCards() && sum.balanceDate &&
+                      m('div.card-sub', `as of ${fmtDate(sum.balanceDate)}`),
+                    !accountBalanceCards() && !sum.balanceDate &&
+                      m('div.card-sub', 'import a CSV to start'),
+                  ]),
 
               // Paycheck countdown
               m('div.stat-card', [
@@ -292,8 +371,6 @@
             ]),
 
             // ── Detected recurring charges ───────────────────────────────────
-            // Filter out anything already tracked so the list stays accurate
-            // after each addition.
             (() => {
               const trackedNames = new Set(s.bills.map(b => b.name));
               const untracked = (s.detected || []).filter(d => !trackedNames.has(d.description));
@@ -324,7 +401,12 @@
               m('h2.section-title', 'Bills'),
               m('div.bills-list', s.bills.map(bill =>
                 m('div.bill-row', [
-                  m('div.bill-name', bill.name),
+                  m('div.bill-info', [
+                    bill.account_color && m('span.account-dot.dot-sm', {
+                      style: `background:${bill.account_color}`,
+                    }),
+                    m('div.bill-name', bill.name),
+                  ]),
                   m('div.bill-meta', [
                     bill.amount
                       ? m('span', fmtMoney(bill.amount))
