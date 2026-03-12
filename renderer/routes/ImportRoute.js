@@ -185,7 +185,7 @@
                   m('th', 'Category'),
                 ])),
                 m('tbody', s.preview.map((row, i) =>
-                  m('tr', { key: i, class: row.amount < 0 ? 'debit' : 'credit' }, [
+                  m('tr', { class: row.amount < 0 ? 'debit' : 'credit' }, [
                     m('td.mono', fmtDate(row.postDate)),
                     m('td.desc', row.description),
                     m('td.amount.right.mono', fmtAmount(row.amount)),

@@ -155,7 +155,6 @@
           }, 'All accounts'),
           ...s.accounts.map(acct =>
             m('button.account-pill', {
-              key: acct.id,
               class: s.txAccountId === acct.id ? 'active' : '',
               style: s.txAccountId === acct.id
                 ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
@@ -215,7 +214,7 @@
             s.txList.map(tx => {
               const isEditing = s.editingId === tx.id;
 
-              return m('div.txl-row-wrap', { key: tx.id }, [
+              return m('div.txl-row-wrap', [
 
                 // ── Read row ───────────────────────────────────────────────
                 m('div.txl-row', {

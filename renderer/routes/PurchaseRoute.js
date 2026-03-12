@@ -160,7 +160,7 @@
                     `−${fmtMoney(res.details.billsDue7Total)}`),
                 ]),
                 res.details.billsDue7.map(bill =>
-                  m('div.mmi-detail-row.mmi-detail-row--sub', {key: bill.name}, [
+                  m('div.mmi-detail-row.mmi-detail-row--sub', [
                     m('span.mmi-detail-label', `${bill.name} (due ${fmtDate(bill.dueDate)})`),
                     m('span.mmi-detail-value.mmi-debit.muted',
                       `−${fmtMoney(bill.amount)}`),

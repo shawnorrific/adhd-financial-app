@@ -334,7 +334,7 @@
 
                   const isEditing = s.editId === bill.id;
 
-                  return m('div.bill-card', { key: bill.id }, isEditing
+                  return m('div.bill-card', isEditing
 
                     // ── Edit mode ─────────────────────────────────────────
                     ? [

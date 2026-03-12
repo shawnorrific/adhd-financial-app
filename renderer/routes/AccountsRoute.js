@@ -200,7 +200,7 @@
               : m('div.bills-list-wrap', s.accounts.map(account => {
                   const isEditing = s.editId === account.id;
 
-                  return m('div.bill-card', { key: account.id }, isEditing
+                  return m('div.bill-card', isEditing
 
                     // ── Edit mode ─────────────────────────────────────────
                     ? [
