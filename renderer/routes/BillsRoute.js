@@ -28,8 +28,15 @@
     bnpl:        'BNPL (Affirm)',
   };
 
+  const FREQ_LABELS = {
+    weekly:      'Weekly',
+    biweekly:    'Every 2 weeks',
+    semimonthly: 'Twice a month',
+    monthly:     'Monthly',
+  };
+
   function defaultForm() {
-    return { name: '', amount: '', dueDay: '', categoryId: '', notes: '', accountId: '' };
+    return { name: '', amount: '', dueDay: '', frequency: '', categoryId: '', notes: '', accountId: '' };
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -98,6 +105,7 @@
         name:        f.name.trim(),
         amount:      f.amount     ? parseFloat(f.amount)          : null,
         due_day:     f.dueDay     ? parseInt(f.dueDay, 10)        : null,
+        frequency:   f.frequency  || null,
         category_id: f.categoryId ? parseInt(f.categoryId, 10)    : null,
         account_id:  f.accountId  ? parseInt(f.accountId, 10)     : null,
         notes:       f.notes.trim() || null,
@@ -115,6 +123,7 @@
         name:       bill.name,
         amount:     bill.amount      != null ? String(bill.amount)      : '',
         dueDay:     bill.due_day     != null ? String(bill.due_day)     : '',
+        frequency:  bill.frequency   || '',
         categoryId: bill.category_id != null ? String(bill.category_id) : '',
         accountId:  bill.account_id  != null ? String(bill.account_id)  : '',
         notes:      bill.notes || '',
@@ -132,6 +141,7 @@
         name:        f.name.trim(),
         amount:      f.amount     ? parseFloat(f.amount)          : null,
         due_day:     f.dueDay     ? parseInt(f.dueDay, 10)        : null,
+        frequency:   f.frequency  || null,
         category_id: f.categoryId ? parseInt(f.categoryId, 10)    : null,
         account_id:  f.accountId  ? parseInt(f.accountId, 10)     : null,
         notes:       f.notes.trim() || null,
@@ -209,6 +219,14 @@
         ...s.accounts.map(a => m('option', { value: a.id }, a.name)),
       ];
 
+      const freqOptions = [
+        m('option', { value: '' }, '— Frequency —'),
+        m('option', { value: 'monthly' },     'Monthly'),
+        m('option', { value: 'biweekly' },    'Every 2 weeks'),
+        m('option', { value: 'weekly' },      'Weekly'),
+        m('option', { value: 'semimonthly' }, 'Twice a month'),
+      ];
+
       // ── Account filter pills ─────────────────────────────────────────────
       function accountPills() {
         if (!s.accounts.length) return null;
@@ -242,7 +260,8 @@
           m(m.route.Link, { href: '/bills',     class: 'nav-link active' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
-          m(m.route.Link, { href: '/purchase',  class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
+          m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
         ]),
 
         m('div.bills-body', [
@@ -265,7 +284,7 @@
 
             // ── Add bill form ─────────────────────────────────────────────
             s.showAdd && m('div.bill-form-card', [
-              m('div.bill-form-grid.bill-form-grid--5col', [
+              m('div.bill-form-grid.bill-form-grid--6col', [
                 m('input.form-input', {
                   placeholder: 'Bill name *',
                   value: s.addForm.name,
@@ -281,6 +300,10 @@
                   value: s.addForm.dueDay,
                   oninput: e => { s.addForm.dueDay = e.target.value; },
                 }),
+                m('select.cat-select', {
+                  value: s.addForm.frequency,
+                  onchange: e => { s.addForm.frequency = e.target.value; },
+                }, freqOptions),
                 m('select.cat-select', {
                   value: s.addForm.categoryId,
                   onchange: e => { s.addForm.categoryId = e.target.value; },
@@ -315,7 +338,7 @@
 
                     // ── Edit mode ─────────────────────────────────────────
                     ? [
-                        m('div.bill-form-grid.bill-form-grid--5col', [
+                        m('div.bill-form-grid.bill-form-grid--6col', [
                           m('input.form-input', {
                             value: s.editForm.name,
                             oninput: e => { s.editForm.name = e.target.value; },
@@ -330,6 +353,10 @@
                             value: s.editForm.dueDay,
                             oninput: e => { s.editForm.dueDay = e.target.value; },
                           }),
+                          m('select.cat-select', {
+                            value: s.editForm.frequency,
+                            onchange: e => { s.editForm.frequency = e.target.value; },
+                          }, freqOptions),
                           m('select.cat-select', {
                             value: s.editForm.categoryId,
                             onchange: e => { s.editForm.categoryId = e.target.value; },
@@ -363,6 +390,9 @@
                             bill.amount
                               ? m('span.bill-amount', fmtMoney(bill.amount))
                               : m('span.muted', 'variable amount'),
+                            bill.frequency
+                              ? m('span.bill-due', ` \u00B7 ${FREQ_LABELS[bill.frequency] || bill.frequency}`)
+                              : null,
                             bill.due_day
                               ? m('span.bill-due', ` \u00B7 ${billDueText(bill.due_day)}`)
                               : m('span.muted', ' \u00B7 no due day'),

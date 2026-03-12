@@ -847,9 +847,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   margin-bottom: 0;
 }
 
-/* ── Bills form 5-col grid ───────────────────────────────────────────────── */
+/* ── Bills form 5-col / 6-col grid ──────────────────────────────────────── */
 .bill-form-grid--5col {
   grid-template-columns: 2fr 1fr 1fr 1.5fr 1.5fr;
+}
+.bill-form-grid--6col {
+  grid-template-columns: 2fr 1fr 1fr 1fr 1.5fr 1.5fr;
 }
 
 /* ── Accounts legend ─────────────────────────────────────────────────────── */
@@ -1029,3 +1032,153 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .mmi-detail-value { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
 .mmi-debit        { color: var(--red); }
 .mmi-suggest-date { color: var(--accent); font-weight: 700; font-family: var(--font); font-size: 14px; }
+
+/* ── Transactions page ───────────────────────────────────────────────────── */
+.tx-page      { display: flex; flex-direction: column; min-height: 100vh; }
+.tx-page-body {
+  flex: 1;
+  padding: 28px 32px 64px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.tx-page-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.tx-page-header .page-title { margin-bottom: 0; }
+.tx-page-header .tx-count   { font-size: 13px; color: var(--muted); }
+
+/* ── Transaction list ────────────────────────────────────────────────────── */
+.txl { display: flex; flex-direction: column; }
+
+/* Shared column widths via named grid */
+.txl-head,
+.txl-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 110px 160px 140px 44px;
+  gap: 0 12px;
+  align-items: center;
+  padding: 0 14px;
+}
+
+.txl-head {
+  padding-top:    10px;
+  padding-bottom: 10px;
+  font-size:      11px;
+  font-weight:    700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color:          var(--muted);
+  border-bottom:  1px solid var(--border);
+  position: sticky;
+  top: 52px; /* below nav */
+  background: var(--bg);
+  z-index: 5;
+}
+
+.txl-row-wrap {
+  border-bottom: 1px solid var(--border);
+}
+.txl-row-wrap:last-child { border-bottom: none; }
+
+.txl-row {
+  min-height: 42px;
+  padding-top:    7px;
+  padding-bottom: 7px;
+  transition: background 0.1s;
+}
+.txl-row:hover         { background: var(--surface2); }
+.txl-row--debit        { background: var(--red-dim); }
+.txl-row--credit       { background: var(--green-dim); }
+.txl-row--debit:hover  { background: rgba(231,76,60,.14); }
+.txl-row--credit:hover { background: rgba(46,204,113,.14); }
+.txl-row--editing      { background: var(--surface2) !important; border-bottom: none; }
+
+/* Column alignments */
+.txl-col--date   { font-size: 13px; white-space: nowrap; }
+.txl-col--desc   { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.txl-col--amt    { text-align: right; font-size: 13px; white-space: nowrap; }
+.txl-col--cat    { font-size: 13px; min-width: 0; }
+.txl-col--acct   { font-size: 13px; min-width: 0; }
+.txl-col--action { display: flex; justify-content: flex-end; }
+
+.txl-desc-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.txl-debit  { color: var(--red); }
+.txl-credit { color: var(--green); }
+
+.txl-cat-badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+.txl-cat-badge--impulse { color: var(--yellow); border-color: rgba(241,196,15,.3); background: rgba(241,196,15,.08); }
+
+/* ── Inline edit form ─────────────────────────────────────────────────────── */
+.txl-edit-form {
+  padding: 14px 14px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.txl-edit-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.txl-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* ── Track as bill section ────────────────────────────────────────────────── */
+.txl-bill-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.txl-bill-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.txl-bill-check-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+
+.txl-bill-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.txl-bill-fields .txl-edit-field { min-width: 160px; }
