@@ -38,6 +38,7 @@ function parseCSV(text) {
   for (let i = 1; i < lines.length; i++) {
     const vals = splitLine(lines[i]);
     if (vals.length < 4) continue;
+    if (vals.every(v => v.trim() === '')) continue;
 
     const col = name => {
       const idx = header.indexOf(name);
@@ -60,7 +61,7 @@ function parseCSV(text) {
   }
 
   // Drop rows with no description or unparseable date
-  return rows.filter(r => r.description && r.postDate);
+  return rows.filter(r => r.postDate && r.description && (r.amount !== null && r.amount !== undefined));
 }
 
 /** Split one CSV line, respecting double-quoted fields that may contain commas. */
@@ -86,7 +87,7 @@ function parseAmount(s) {
 function toISO(raw) {
   const m = (raw || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) return `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
-  return raw;
+  return null;
 }
 
 // ── Preview ───────────────────────────────────────────────────────────────────
