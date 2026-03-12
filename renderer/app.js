@@ -32,6 +32,7 @@ const TestRoute = {
         m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
         m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
         m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
+        m(m.route.Link, { href: '/purchase',  class: 'nav-link' }, 'May I Buy?'),
       ]),
       m('div.test-body', [
         m('h1', 'Stack check'),
@@ -58,5 +59,6 @@ m.route(document.getElementById('app'), '/dashboard', {
   '/bills':     window.Routes.Bills,
   '/import':    window.Routes.Import,
   '/accounts':  window.Routes.Accounts,
+  '/purchase':  window.Routes.Purchase,
   '/test':      TestRoute,
 });

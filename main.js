@@ -42,6 +42,7 @@ app.whenReady().then(() => {
   categorizer     = require('./src/categorizer');
   csvImporter     = require('./src/csv-importer');
   dashboard       = require('./src/dashboard');
+  purchaseChecker = require('./src/purchase-checker');
   googleCalendar  = require('./src/google-calendar');
 
   createWindow();
@@ -142,6 +143,10 @@ ipcMain.handle('accounts:delete', (_, id) => {
 // ── IPC: dashboard ────────────────────────────────────────────────────────────
 ipcMain.handle('dashboard:summary', (_, { accountId } = {}) =>
   dashboard.getSummary(accountId || null));
+
+// ── IPC: purchase checker ─────────────────────────────────────────────────────
+ipcMain.handle('purchase:check', (_, { itemName, cost }) =>
+  purchaseChecker.checkPurchase(itemName, parseFloat(cost)));
 
 // ── IPC: bills ────────────────────────────────────────────────────────────────
 ipcMain.handle('bills:list', (_, { accountId } = {}) => {
