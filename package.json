@@ -1,24 +1,16 @@
 {
   "name": "adhd-financial-app",
   "version": "0.1.0",
-  "description": "Local-first personal finance app designed for ADHD brains",
+  "description": "Local-first personal finance app for ADHD brains",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "postinstall": "node scripts/vendor-mithril.js"
+    "start": "electron ."
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^9.4.3",
-    "mithril": "^2.2.2"
+    "better-sqlite3": "^9.4.3"
   },
   "devDependencies": {
-    "electron": "^29.1.0"
+    "electron": "^36.9.5"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "license": "MIT"
 }

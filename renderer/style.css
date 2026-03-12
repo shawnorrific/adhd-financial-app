@@ -1,0 +1,90 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #1a1d27;
+  --border:    #2a2d3a;
+  --text:      #e8eaf0;
+  --muted:     #8b8fa8;
+  --green:     #2ecc71;
+  --yellow:    #f1c40f;
+  --red:       #e74c3c;
+  --accent:    #5b7fff;
+  --radius:    8px;
+  --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+#app {
+  height: 100%;
+}
+
+/* ── Test route ───────────────────────────────────────────────────────────── */
+.test-route {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 16px;
+  padding: 32px;
+}
+
+.logo {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.test-route h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.check-label {
+  flex: 1;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.check-badge {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.check-badge.ok      { color: var(--green); }
+.check-badge.error   { color: var(--red); }
+.check-badge.pending { color: var(--yellow); }
+
+.hint {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
