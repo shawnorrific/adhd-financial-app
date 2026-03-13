@@ -160,7 +160,7 @@ function importRows(rows, accountId = null, filename = null) {
            import_batch_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?)
       `, [
-        row.accountNumber  || null,
+        row.accountNumber  || '',
         row.postDate,
         row.checkNumber    || null,
         row.description,

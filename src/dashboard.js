@@ -114,13 +114,18 @@ function getSummary(accountId = null) {
   const paycheckFrequency = getSetting('paycheck_frequency');
   const paycheckLastDate  = getSetting('paycheck_last_date');  // '' when not set
 
-  let nextPaycheckDate  = null;
-  let daysUntilPaycheck = null;
+  let nextPaycheckDate     = null;
+  let nextNextPaycheckDate = null;
+  let daysUntilPaycheck    = null;
 
   if (paycheckLastDate) {
     nextPaycheckDate  = calcNextPaycheck(paycheckFrequency || 'biweekly', paycheckLastDate, today);
     daysUntilPaycheck = daysBetween(today, nextPaycheckDate);
     if (daysUntilPaycheck < 0) daysUntilPaycheck = 0;
+
+    // One additional pay period beyond the next paycheck
+    const dayAfterNext = toISO(new Date(new Date(nextPaycheckDate + 'T00:00:00').getTime() + 86400000));
+    nextNextPaycheckDate = calcNextPaycheck(paycheckFrequency || 'biweekly', nextPaycheckDate, dayAfterNext);
   }
 
   // ── Bills ──────────────────────────────────────────────────────────────────
@@ -144,20 +149,32 @@ function getSummary(accountId = null) {
   }
   if (!nextBill) nextBillDaysUntil = null;
 
-  // All active bills with amounts (used in cushion calculation)
+  // Bills due between now and the paycheck after next (used in cushion calculation)
   let upcomingBillsTotal = 0;
   const upcomingBills    = [];
-  if (nextPaycheckDate) {
+  if (nextNextPaycheckDate) {
     for (const bill of bills) {
       if (!bill.amount) continue;
       const { nextDate } = nextDueInfo(bill.due_day, today);
-      upcomingBillsTotal += bill.amount;
-      upcomingBills.push({ ...bill, nextDate });
+      if (nextDate <= nextNextPaycheckDate) {
+        upcomingBillsTotal += bill.amount;
+        upcomingBills.push({ ...bill, nextDate });
+      }
     }
   }
 
   console.log('[dashboard] paycheckFrequency:', paycheckFrequency, 'paycheckLastDate:', paycheckLastDate);
   console.log('[dashboard] bills count:', bills.length, bills.map(b => b.name));
+
+  // Estimate paycheck size from average of recent Income transactions
+  const incomeRow = db.get(`
+    SELECT AVG(amount) AS avg_income
+    FROM   transactions
+    WHERE  amount > 0
+      AND  post_date >= date('now', '-180 days')
+      AND  category_id = (SELECT id FROM categories WHERE name = 'Income' LIMIT 1)
+  `);
+  const estimatedPaycheck = incomeRow?.avg_income ?? null;
 
   // ── "Am I okay right now?" ─────────────────────────────────────────────────
   const buffer = parseFloat(getSetting('balance_buffer') || '200');
@@ -173,7 +190,7 @@ function getSummary(accountId = null) {
       status        = 'setup';
       statusMessage = 'Add your recurring bills';
     } else {
-      cushion = balance - upcomingBillsTotal;
+      cushion = balance + (estimatedPaycheck ?? 0) - upcomingBillsTotal;
       if (cushion >= buffer) {
         status        = 'ok';
         statusMessage = "You're okay";
@@ -227,6 +244,7 @@ function getSummary(accountId = null) {
     nextBillDaysUntil:  nextBillDaysUntil ?? null,
     upcomingBills,
     upcomingBillsTotal,
+    estimatedPaycheck,
     cushion,
     buffer,
     status,               // 'unknown' | 'setup' | 'ok' | 'tight' | 'danger'
