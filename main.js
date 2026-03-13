@@ -75,7 +75,7 @@ ipcMain.handle('db:ping', () => {
 });
 
 // ── IPC: CSV import ───────────────────────────────────────────────────────────
-ipcMain.handle('csv:preview', (_, content) => csvImporter.previewCSV(content));
+ipcMain.handle('csv:preview', (_, { content, filePath }) => csvImporter.previewCSV(content, filePath || null));
 ipcMain.handle('csv:import',  (_, { rows, accountId, filename }) =>
   csvImporter.importRows(rows, accountId || null, filename || null));
 
@@ -299,6 +299,18 @@ ipcMain.handle('watcher:set-path', (_, newPath) => {
   return { ok: true };
 });
 
+ipcMain.handle('dialog:open-file', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select CSV file',
+    properties: ['openFile'],
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+  });
+  if (canceled || !filePaths.length) return null;
+  const filePath = filePaths[0];
+  const content  = require('fs').readFileSync(filePath, 'utf8');
+  return { filePath, content };
+});
+
 ipcMain.handle('dialog:open-folder', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: 'Select Watch Folder',
@@ -339,6 +351,9 @@ ipcMain.handle('danger:wipe', (_, target) => {
   }
   if (target === 'accounts' || target === 'all') {
     db.run('DELETE FROM accounts');
+  }
+  if (target === 'all') {
+    db.run("DELETE FROM _migrations WHERE name != '001_initial_schema.sql'");
   }
   return { ok: true };
 });

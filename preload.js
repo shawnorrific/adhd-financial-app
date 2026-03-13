@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   ping: () => ipcRenderer.invoke('db:ping'),
 
   csv: {
-    preview: content                      => ipcRenderer.invoke('csv:preview', content),
+    preview: (content, filePath)          => ipcRenderer.invoke('csv:preview', { content, filePath }),
     import:  (rows, accountId, filename)  => ipcRenderer.invoke('csv:import',  { rows, accountId, filename }),
   },
 
@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   dialog: {
+    openFile:   () => ipcRenderer.invoke('dialog:open-file'),
     openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
   },
 

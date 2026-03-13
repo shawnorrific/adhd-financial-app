@@ -80,36 +80,27 @@
       if (s._offUnrecognized) s._offUnrecognized();
     },
 
-    // Read the file with FileReader then call csv:preview over IPC
-    loadFile(vnode, file) {
-      if (!file) return;
-      const s = vnode.state;
-
-      if (!file.name.toLowerCase().endsWith('.csv')) {
-        s.error = 'Please select a .csv file exported from your bank.';
-        m.redraw();
-        return;
-      }
+    async openFile(vnode) {
+      const s      = vnode.state;
+      const result = await window.api.dialog.openFile();
+      if (!result) return;
+      const { filePath, content } = result;
 
       s.stage           = 'loading';
       s.error           = null;
-      s.pendingFilename = file.name;
+      s.pendingFilename = filePath.split(/[\\/]/).pop();
       m.redraw();
 
-      const reader = new FileReader();
-      reader.onload = async e => {
-        try {
-          const rows = await window.api.csv.preview(e.target.result);
-          if (!rows.length) throw new Error('No transactions found — check the file format.');
-          s.preview = rows;
-          s.stage   = 'previewing';
-        } catch (err) {
-          s.error = err.message || String(err);
-          s.stage = 'error';
-        }
-        m.redraw();
-      };
-      reader.readAsText(file);
+      try {
+        const rows = await window.api.csv.preview(content, filePath);
+        if (!rows.length) throw new Error('No transactions found — check the file format.');
+        s.preview = rows;
+        s.stage   = 'previewing';
+      } catch (err) {
+        s.error = err.message || String(err);
+        s.stage = 'error';
+      }
+      m.redraw();
     },
 
     async doImport(vnode) {
@@ -219,24 +210,11 @@
           // ── Account selector ─────────────────────────────────────────────
           (s.stage === 'idle' || s.stage === 'previewing') && accountSelector(),
 
-          // ── Idle — drop zone ────────────────────────────────────────────────
-          s.stage === 'idle' && m('label.drop-zone', {
-            ondragover(e)  { e.preventDefault(); e.currentTarget.classList.add('drag-over'); },
-            ondragleave(e) { e.currentTarget.classList.remove('drag-over'); },
-            ondrop(e) {
-              e.preventDefault();
-              e.currentTarget.classList.remove('drag-over');
-              self.loadFile(vnode, e.dataTransfer.files[0]);
-            },
-          }, [
+          // ── Idle — file picker ───────────────────────────────────────────
+          s.stage === 'idle' && m('div.drop-zone', [
             m('div.drop-icon', '📂'),
-            m('p.drop-primary', 'Drop your CSV here'),
-            m('p.drop-hint', 'or click to choose a file'),
-            m('span.btn', 'Choose file'),
-            m('input[type=file][accept=.csv]', {
-              style: 'display:none',
-              onchange: e => self.loadFile(vnode, e.target.files[0]),
-            }),
+            m('p.drop-primary', 'Choose a CSV file to import'),
+            m('button.btn', { onclick() { self.openFile(vnode); } }, 'Choose file'),
           ]),
 
           // ── Loading / importing spinner ────────────────────────────────────

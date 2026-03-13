@@ -544,8 +544,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 
 .tx-table thead {
   background: var(--surface);
-  position: sticky;
-  top: 52px; /* below nav */
 }
 .tx-table th {
   padding: 10px 14px;
@@ -557,6 +555,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   color: var(--muted);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  position: sticky;
+  top: 52px;
+  background: var(--surface);
+  z-index: 1;
 }
 .tx-table th.right { text-align: right; }
 
@@ -565,8 +567,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .tx-table tbody tr:hover { background: var(--surface2); }
 .tx-table tbody tr.debit  { background: var(--red-dim); }
 .tx-table tbody tr.credit { background: var(--green-dim); }
-.tx-table tbody tr.debit:hover  { background: rgba(231,76,60,.14); }
-.tx-table tbody tr.credit:hover { background: rgba(46,204,113,.14); }
+.tx-table tbody tr.debit:hover  { background: rgba(231,76,60,.28); }
+.tx-table tbody tr.credit:hover { background: rgba(46,204,113,.26); }
 
 .tx-table td {
   padding: 9px 14px;
