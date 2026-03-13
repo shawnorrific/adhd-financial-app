@@ -131,7 +131,16 @@ function importRows(rows, accountId = null, filename = null) {
   let imported = 0;
   let skipped  = 0;
 
-  for (const row of rows) {
+  // Collapse exact duplicates within the batch before hitting the DB constraint.
+  const seen = new Set();
+  const dedupedRows = rows.filter(row => {
+    const key = `${row.accountNumber ?? ''}|${row.postDate}|${row.description}|${row.amount}`;
+    if (seen.has(key)) { skipped++; return false; }
+    seen.add(key);
+    return true;
+  });
+
+  for (const row of dedupedRows) {
     // Guard: skip rows with missing required fields rather than writing bad data
     if (!row.postDate || !row.description || !Number.isFinite(row.amount)) {
       skipped++;

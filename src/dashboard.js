@@ -144,17 +144,15 @@ function getSummary(accountId = null) {
   }
   if (!nextBill) nextBillDaysUntil = null;
 
-  // Bills due before the next paycheck (used in cushion calculation)
+  // All active bills with amounts (used in cushion calculation)
   let upcomingBillsTotal = 0;
   const upcomingBills    = [];
   if (nextPaycheckDate) {
     for (const bill of bills) {
       if (!bill.amount) continue;
       const { nextDate } = nextDueInfo(bill.due_day, today);
-      if (nextDate <= nextPaycheckDate) {
-        upcomingBillsTotal += bill.amount;
-        upcomingBills.push({ ...bill, nextDate });
-      }
+      upcomingBillsTotal += bill.amount;
+      upcomingBills.push({ ...bill, nextDate });
     }
   }
 
