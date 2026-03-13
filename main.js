@@ -75,7 +75,7 @@ ipcMain.handle('db:ping', () => {
 });
 
 // ── IPC: CSV import ───────────────────────────────────────────────────────────
-ipcMain.handle('csv:preview', (_, content) => csvImporter.previewCSV(content));
+ipcMain.handle('csv:preview', (_, { content, filePath }) => csvImporter.previewCSV(content, filePath || null));
 ipcMain.handle('csv:import',  (_, { rows, accountId, filename }) =>
   csvImporter.importRows(rows, accountId || null, filename || null));
 

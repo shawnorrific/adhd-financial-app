@@ -1,7 +1,49 @@
 'use strict';
 
+const crypto                        = require('crypto');
+const fs                            = require('fs');
 const db                            = require('../db');
 const { categorize, learnCorrection } = require('./categorizer');
+
+// ── Transaction ID ────────────────────────────────────────────────────────────
+
+/**
+ * Ensure every data row in the CSV text has a 'Transaction ID' column.
+ *
+ * If the header already contains 'transaction id', the text is returned
+ * unchanged. Otherwise a UUID is prepended to every non-blank data line and
+ * the header gains a 'Transaction ID' column as its first field.
+ *
+ * If filePath is provided the modified CSV is written back to disk so that
+ * re-importing the same file detects existing IDs and skips duplicates.
+ * A write failure is non-fatal — the modified text is still returned so the
+ * current import proceeds normally.
+ *
+ * @param {string}      text      - raw CSV text
+ * @param {string|null} filePath  - absolute path to write back to, or null
+ * @returns {string} - text with Transaction ID column guaranteed present
+ */
+function ensureTransactionIds(text, filePath) {
+  const eol      = text.includes('\r\n') ? '\r\n' : '\n';
+  const lines    = text.split(/\r?\n/);
+  const header   = splitLine(lines[0] || '').map(h => h.trim().toLowerCase());
+
+  if (header.includes('transaction id')) return text;
+
+  const newLines = lines.map((line, i) => {
+    if (i === 0)               return `Transaction ID,${line}`;
+    if (line.trim() === '')    return line;
+    return `${crypto.randomUUID()},${line}`;
+  });
+
+  const modified = newLines.join(eol);
+
+  if (filePath) {
+    try { fs.writeFileSync(filePath, modified, 'utf8'); } catch (_) { /* non-fatal */ }
+  }
+
+  return modified;
+}
 
 // ── CSV parsing ───────────────────────────────────────────────────────────────
 
@@ -49,6 +91,7 @@ function parseCSV(text) {
     const credit = parseAmount(col('credit'));
 
     rows.push({
+      transactionId: col('transaction id') || null,
       accountNumber: col('account number') || '',
       // 'Post Date' = Verity CU  |  'Transaction Date' = Capital One
       postDate:      toISO(col('post date') || col('postdate') || col('transaction date')),
@@ -99,8 +142,8 @@ function toISO(raw) {
  * @param {string} text
  * @returns {object[]}
  */
-function previewCSV(text) {
-  const rows = parseCSV(text);
+function previewCSV(text, filePath = null) {
+  const rows = parseCSV(ensureTransactionIds(text, filePath));
   return rows.map(row => ({
     ...row,
     ...categorize(row.description),
@@ -131,16 +174,13 @@ function importRows(rows, accountId = null, filename = null) {
   let imported = 0;
   let skipped  = 0;
 
-  // Collapse exact duplicates within the batch before hitting the DB constraint.
-  const seen = new Set();
-  const dedupedRows = rows.filter(row => {
-    const key = `${row.accountNumber ?? ''}|${row.postDate}|${row.description}|${row.amount}`;
-    if (seen.has(key)) { skipped++; return false; }
-    seen.add(key);
-    return true;
-  });
+  for (const row of rows) {
+    // Skip rows whose Transaction ID is already in the database.
+    if (row.transactionId && db.get('SELECT 1 FROM transactions WHERE transaction_id = ?', [row.transactionId])) {
+      skipped++;
+      continue;
+    }
 
-  for (const row of dedupedRows) {
     // Guard: skip rows with missing required fields rather than writing bad data
     if (!row.postDate || !row.description || !Number.isFinite(row.amount)) {
       skipped++;
@@ -155,11 +195,12 @@ function importRows(rows, accountId = null, filename = null) {
     try {
       db.run(`
         INSERT INTO transactions
-          (account_number, post_date, check_number, description,
+          (transaction_id, account_number, post_date, check_number, description,
            amount, status, balance, category_id, is_user_categorized, source, account_id,
            import_batch_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, ?)
       `, [
+        row.transactionId  || null,
         row.accountNumber  || '',
         row.postDate,
         row.checkNumber    || null,
