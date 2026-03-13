@@ -99,6 +99,7 @@
       const reader = new FileReader();
       reader.onload = async e => {
         try {
+          console.log(file.path);
           const rows = await window.api.csv.preview(e.target.result, file.path);
           if (!rows.length) throw new Error('No transactions found — check the file format.');
           s.preview = rows;
