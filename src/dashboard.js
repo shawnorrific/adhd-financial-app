@@ -149,9 +149,12 @@ function getSummary(accountId = null) {
   }
   if (!nextBill) nextBillDaysUntil = null;
 
-  // Bills due between now and the paycheck after next (used in cushion calculation)
-  let upcomingBillsTotal = 0;
-  const upcomingBills    = [];
+  // Bills due between now and the paycheck after next (used in cushion calculation).
+  // Also track the sub-total of bills due before the *next* paycheck so we can
+  // compute a pre-paycheck cushion and take the more conservative of the two.
+  let billsBeforeNextTotal = 0;  // today → nextPaycheckDate
+  let upcomingBillsTotal   = 0;  // today → nextNextPaycheckDate
+  const upcomingBills      = [];
   if (nextNextPaycheckDate) {
     for (const bill of bills) {
       if (!bill.amount) continue;
@@ -159,6 +162,9 @@ function getSummary(accountId = null) {
       if (nextDate <= nextNextPaycheckDate) {
         upcomingBillsTotal += bill.amount;
         upcomingBills.push({ ...bill, nextDate });
+      }
+      if (nextPaycheckDate && nextDate <= nextPaycheckDate) {
+        billsBeforeNextTotal += bill.amount;
       }
     }
   }
@@ -190,7 +196,12 @@ function getSummary(accountId = null) {
       status        = 'setup';
       statusMessage = 'Add your recurring bills';
     } else {
-      cushion = balance + (estimatedPaycheck ?? 0) - upcomingBillsTotal;
+      // Pre-paycheck: can I cover bills before my next paycheck arrives?
+      // Post-paycheck: after the paycheck lands, can I cover everything through the one after?
+      // Show whichever is lower — the most honest picture.
+      const preCushion  = balance - billsBeforeNextTotal;
+      const postCushion = balance + (estimatedPaycheck ?? 0) - upcomingBillsTotal;
+      cushion = Math.min(preCushion, postCushion);
       if (cushion >= buffer) {
         status        = 'ok';
         statusMessage = "You're okay";

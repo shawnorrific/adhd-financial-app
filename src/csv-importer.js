@@ -49,7 +49,7 @@ function parseCSV(text) {
     const credit = parseAmount(col('credit'));
 
     rows.push({
-      accountNumber: col('account number') || null,
+      accountNumber: col('account number') || '',
       // 'Post Date' = Verity CU  |  'Transaction Date' = Capital One
       postDate:      toISO(col('post date') || col('postdate') || col('transaction date')),
       checkNumber:   col('check') || null,
