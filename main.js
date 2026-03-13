@@ -299,6 +299,18 @@ ipcMain.handle('watcher:set-path', (_, newPath) => {
   return { ok: true };
 });
 
+ipcMain.handle('dialog:open-file', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select CSV file',
+    properties: ['openFile'],
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+  });
+  if (canceled || !filePaths.length) return null;
+  const filePath = filePaths[0];
+  const content  = require('fs').readFileSync(filePath, 'utf8');
+  return { filePath, content };
+});
+
 ipcMain.handle('dialog:open-folder', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: 'Select Watch Folder',

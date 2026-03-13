@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   dialog: {
+    openFile:   () => ipcRenderer.invoke('dialog:open-file'),
     openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
   },
 
