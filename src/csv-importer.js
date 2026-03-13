@@ -164,7 +164,6 @@ function previewCSV(text, filePath = null) {
  * @returns {{ imported: number, skipped: number, batchId: number|null }}
  */
 function importRows(rows, accountId = null, filename = null) {
-  console.log(rows[0].transactionId)
   // Create a batch record up front so we have an id to tag transactions with
   const batchRun = db.run(
     'INSERT INTO import_batches (filename, account_id) VALUES (?, ?)',
@@ -216,8 +215,10 @@ function importRows(rows, accountId = null, filename = null) {
       ]);
       imported++;
     } catch (e) {
+      console.log('[import] ERROR:', e.message, row.transactionId, row.description);
       if (e.message && e.message.includes('UNIQUE')) {
         skipped++; // exact duplicate — silently skip
+        // console.log(row.transactionId + ' | ' + row.postDate + ' | ' + row.description + ' | ' + row.amount);
       } else {
         throw e;
       }
