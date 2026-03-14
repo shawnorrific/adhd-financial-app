@@ -303,25 +303,12 @@
                   }, 'Configure'),
                 ],
 
-                // Estimated / overridden paycheck amount + manual override input
-                m('div.paycheck-amount-row', [
-                  m('div.card-sub.paycheck-detected',
-                    sum.estimatedPaycheck != null
-                      ? (sum.paycheckAmountOverride ? 'Override: ' : 'Est. paycheck: ') + fmtMoney(sum.estimatedPaycheck)
-                      : 'Amount unknown'
-                  ),
-                  m('div.paycheck-amount-override', [
-                    m('input.form-input[type=number]', {
-                      placeholder: 'Override amount',
-                      value: s.pa.value,
-                      oninput: e => { s.pa.value = e.target.value; },
-                    }),
-                    m('button.btn.btn-ghost', {
-                      disabled: s.pa.saving,
-                      onclick() { self.savePaycheckAmount(vnode); },
-                    }, s.pa.saving ? 'Saving…' : 'Save'),
-                  ]),
-                ]),
+                // Estimated / overridden paycheck amount (always visible)
+                m('div.card-sub.paycheck-detected',
+                  sum.estimatedPaycheck != null
+                    ? (sum.paycheckAmountOverride ? 'Override: ' : 'Est. paycheck: ') + fmtMoney(sum.estimatedPaycheck)
+                    : 'Amount unknown'
+                ),
 
                 // Inline paycheck setup form
                 s.pf.open && m('div.inline-form', [
@@ -340,6 +327,18 @@
                     value: s.pf.lastDate,
                     oninput: e => { s.pf.lastDate = e.target.value; },
                   }),
+                  m('label.form-label', 'Paycheck amount'),
+                  m('div.paycheck-amount-override', [
+                    m('input.form-input[type=number]', {
+                      placeholder: 'Override amount',
+                      value: s.pa.value,
+                      oninput: e => { s.pa.value = e.target.value; },
+                    }),
+                    m('button.btn.btn-ghost', {
+                      disabled: s.pa.saving,
+                      onclick() { self.savePaycheckAmount(vnode); },
+                    }, s.pa.saving ? 'Saving…' : 'Save'),
+                  ]),
                   m('div.form-actions', [
                     m('button.btn.btn-ghost', {
                       onclick() { s.pf.open = false; },
