@@ -250,6 +250,7 @@ function getSummary(accountId = null) {
     upcomingBills,
     upcomingBillsTotal,
     estimatedPaycheck,
+    paycheckAmountOverride: paycheckAmountOverride || '',
     cushion,
     buffer,
     status,               // 'unknown' | 'setup' | 'ok' | 'tight' | 'danger'
