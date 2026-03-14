@@ -3,6 +3,7 @@
 const crypto                        = require('crypto');
 const fs                            = require('fs');
 const db                            = require('../db');
+const path                          = require('path');
 const { categorize, learnCorrection } = require('./categorizer');
 
 // ── Transaction ID ────────────────────────────────────────────────────────────
@@ -38,9 +39,17 @@ function ensureTransactionIds(text, filePath) {
 
   const modified = newLines.join(eol);
 
-  if (filePath) {
-    try { fs.writeFileSync(filePath, modified, 'utf8'); } catch (_) { /* non-fatal */ }
-  }
+if (filePath) {
+  try { 
+    fs.writeFileSync(filePath, modified, 'utf8');
+    // Rename to timestamped filename
+    const dir = path.dirname(filePath);
+    const ext = path.extname(filePath);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const newPath = path.join(dir, `import_${timestamp}${ext}`);
+    fs.renameSync(filePath, newPath);
+  } catch (_) { /* non-fatal */ }
+}
 
   return modified;
 }
