@@ -168,14 +168,52 @@ function getSummary(accountId = null) {
   }
 
   // Estimate paycheck size from average of recent Income transactions
-  const incomeRow = db.get(`
-    SELECT AVG(amount) AS avg_income
+const paycheckAmountOverride = getSetting('paycheck_amount') || '';
+let estimatedPaycheck = null;
+
+if (parseFloat(paycheckAmountOverride) > 0) {
+  estimatedPaycheck = parseFloat(paycheckAmountOverride);
+} else {
+  const deposits = db.all(`
+    SELECT amount, post_date
     FROM   transactions
-    WHERE  amount > 0
-      AND  post_date >= date('now', '-180 days')
-      AND  category_id = (SELECT id FROM categories WHERE name = 'Income' LIMIT 1)
+    WHERE  amount > 500
+    ORDER  BY amount ASC
   `);
-  const estimatedPaycheck = incomeRow?.avg_income ?? null;
+
+  const clusters = [];
+  for (const row of deposits) {
+    let placed = false;
+    for (const cluster of clusters) {
+      if (row.amount / cluster[0].amount <= 1.1) {
+        cluster.push(row);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) clusters.push([row]);
+  }
+
+  let bestCluster = null;
+  for (const cluster of clusters) {
+    if (cluster.length < 4) continue;
+    const byDate = [...cluster].sort((a, b) => (a.post_date < b.post_date ? -1 : 1));
+    const gaps = [];
+    for (let i = 1; i < byDate.length; i++) {
+      const ms = new Date(byDate[i].post_date + 'T00:00:00') - new Date(byDate[i - 1].post_date + 'T00:00:00');
+      gaps.push(ms / 86400000);
+    }
+    const meanGap = gaps.reduce((acc, g) => acc + g, 0) / gaps.length;
+    const stddev  = Math.sqrt(gaps.reduce((acc, g) => acc + (g - meanGap) ** 2, 0) / gaps.length);
+    if (meanGap > 0 && stddev / meanGap < 0.2) {
+      if (!bestCluster || cluster.length > bestCluster.length) bestCluster = cluster;
+    }
+  }
+
+  if (bestCluster) {
+    estimatedPaycheck = bestCluster.reduce((acc, r) => acc + r.amount, 0) / bestCluster.length;
+  }
+}
 
   // ── "Am I okay right now?" ─────────────────────────────────────────────────
   const buffer = parseFloat(getSetting('balance_buffer') || '200');
