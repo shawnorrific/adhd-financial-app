@@ -4,7 +4,7 @@ const { app } = require('electron');
 
 // Store the database in Electron's userData directory so it persists across updates
 // and isn't accidentally included in version control
-const dbPath = path.join(app.getPath('userData'), 'finance.db');
+const dbPath = path.join(app.getPath('userData'), 'finance2.db');
 
 const db = new Database(dbPath);
 
