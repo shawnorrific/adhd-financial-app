@@ -69,6 +69,7 @@
       s.bills    = bills;
       s.accounts = accounts;
       s.loading  = false;
+      s.pa.value = summary.paycheckAmountOverride || '';
 
       // Always detect recurring charges so the list stays available for adding more
       if (summary.balance !== null) {
@@ -103,6 +104,8 @@
       s.selectedAccountId = null;  // null = all accounts
       // Paycheck setup form state
       s.pf = { open: false, frequency: 'biweekly', lastDate: '', saving: false };
+      // Paycheck amount override state
+      s.pa = { value: '', saving: false };
       loadData(vnode);
     },
 
@@ -117,6 +120,15 @@
       ]);
       s.pf.open   = false;
       s.pf.saving = false;
+      loadData(vnode);
+    },
+
+    async savePaycheckAmount(vnode) {
+      const s = vnode.state;
+      s.pa.saving = true;
+      m.redraw();
+      await window.api.settings.set('paycheck_amount', s.pa.value);
+      s.pa.saving = false;
       loadData(vnode);
     },
 
@@ -290,6 +302,26 @@
                     onclick() { s.pf.open = true; },
                   }, 'Configure'),
                 ],
+
+                // Estimated / overridden paycheck amount + manual override input
+                m('div.paycheck-amount-row', [
+                  m('div.card-sub.paycheck-detected',
+                    sum.estimatedPaycheck != null
+                      ? (sum.paycheckAmountOverride ? 'Override: ' : 'Est. paycheck: ') + fmtMoney(sum.estimatedPaycheck)
+                      : 'Amount unknown'
+                  ),
+                  m('div.paycheck-amount-override', [
+                    m('input.form-input[type=number]', {
+                      placeholder: 'Override amount',
+                      value: s.pa.value,
+                      oninput: e => { s.pa.value = e.target.value; },
+                    }),
+                    m('button.btn.btn-ghost', {
+                      disabled: s.pa.saving,
+                      onclick() { self.savePaycheckAmount(vnode); },
+                    }, s.pa.saving ? 'Saving…' : 'Save'),
+                  ]),
+                ]),
 
                 // Inline paycheck setup form
                 s.pf.open && m('div.inline-form', [

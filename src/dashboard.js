@@ -172,15 +172,57 @@ function getSummary(accountId = null) {
   console.log('[dashboard] paycheckFrequency:', paycheckFrequency, 'paycheckLastDate:', paycheckLastDate);
   console.log('[dashboard] bills count:', bills.length, bills.map(b => b.name));
 
-  // Estimate paycheck size from average of recent Income transactions
-  const incomeRow = db.get(`
-    SELECT AVG(amount) AS avg_income
-    FROM   transactions
-    WHERE  amount > 0
-      AND  post_date >= date('now', '-180 days')
-      AND  category_id = (SELECT id FROM categories WHERE name = 'Income' LIMIT 1)
-  `);
-  const estimatedPaycheck = incomeRow?.avg_income ?? null;
+  // Estimate paycheck from recurring deposits > $500 with consistent amounts and spacing
+  const paycheckAmountOverride = getSetting('paycheck_amount');
+  let estimatedPaycheck = null;
+
+  if (paycheckAmountOverride && parseFloat(paycheckAmountOverride) > 0) {
+    estimatedPaycheck = parseFloat(paycheckAmountOverride);
+  } else {
+    // Pull all positive deposits > $500, sorted by amount so we can cluster easily
+    const deposits = db.all(`
+      SELECT amount, post_date
+      FROM   transactions
+      WHERE  amount > 500
+      ORDER  BY amount ASC
+    `);
+
+    // Cluster deposits where every amount is within 10% of the cluster minimum
+    const clusters = [];
+    for (const row of deposits) {
+      let placed = false;
+      for (const cluster of clusters) {
+        if (row.amount / cluster[0].amount <= 1.1) {
+          cluster.push(row);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) clusters.push([row]);
+    }
+
+    // Keep clusters with >= 4 entries whose inter-deposit spacing is consistent
+    // (stddev of day-gaps < 20% of mean gap)
+    let bestCluster = null;
+    for (const cluster of clusters) {
+      if (cluster.length < 4) continue;
+      const byDate = [...cluster].sort((a, b) => (a.post_date < b.post_date ? -1 : 1));
+      const gaps = [];
+      for (let i = 1; i < byDate.length; i++) {
+        const ms = new Date(byDate[i].post_date + 'T00:00:00') - new Date(byDate[i - 1].post_date + 'T00:00:00');
+        gaps.push(ms / 86400000);
+      }
+      const meanGap = gaps.reduce((acc, g) => acc + g, 0) / gaps.length;
+      const stddev  = Math.sqrt(gaps.reduce((acc, g) => acc + (g - meanGap) ** 2, 0) / gaps.length);
+      if (meanGap > 0 && stddev / meanGap < 0.2) {
+        if (!bestCluster || cluster.length > bestCluster.length) bestCluster = cluster;
+      }
+    }
+
+    if (bestCluster) {
+      estimatedPaycheck = bestCluster.reduce((acc, r) => acc + r.amount, 0) / bestCluster.length;
+    }
+  }
 
   // ── "Am I okay right now?" ─────────────────────────────────────────────────
   const buffer = parseFloat(getSetting('balance_buffer') || '200');
@@ -256,6 +298,7 @@ function getSummary(accountId = null) {
     upcomingBills,
     upcomingBillsTotal,
     estimatedPaycheck,
+    paycheckAmountOverride: paycheckAmountOverride || '',
     cushion,
     buffer,
     status,               // 'unknown' | 'setup' | 'ok' | 'tight' | 'danger'

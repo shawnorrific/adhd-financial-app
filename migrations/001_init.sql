@@ -146,4 +146,5 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('google_refresh_token',''),
   ('google_access_token', ''),
   ('google_token_expiry', '0'),
-  ('google_user_email',   '');
+  ('google_user_email',   ''),
+  ('paycheck_amount',     '');
