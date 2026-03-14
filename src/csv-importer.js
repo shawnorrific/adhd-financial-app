@@ -173,9 +173,7 @@ function importRows(rows, accountId = null, filename = null) {
 
   // Only filter by date when a specific account is selected.  Find the most
   // recent post_date already stored for that account; skip anything on or before it.
-  const cutoff = accountId
-    ? (db.get('SELECT MAX(post_date) AS d FROM transactions WHERE account_id = ?', [accountId])?.d ?? null)
-    : null;
+  const cutoff = db.get('SELECT MAX(post_date) AS d FROM transactions')?.d ?? null;
 
   let imported = 0;
   let skipped  = 0;
