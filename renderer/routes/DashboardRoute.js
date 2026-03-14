@@ -117,6 +117,7 @@
       await Promise.all([
         window.api.settings.set('paycheck_frequency', s.pf.frequency),
         window.api.settings.set('paycheck_last_date',  s.pf.lastDate),
+        window.api.settings.set('paycheck_amount',     s.pa.value),
       ]);
       s.pf.open   = false;
       s.pf.saving = false;
@@ -328,17 +329,11 @@
                     oninput: e => { s.pf.lastDate = e.target.value; },
                   }),
                   m('label.form-label', 'Paycheck amount'),
-                  m('div.paycheck-amount-override', [
-                    m('input.form-input[type=number]', {
-                      placeholder: 'Override amount',
-                      value: s.pa.value,
-                      oninput: e => { s.pa.value = e.target.value; },
-                    }),
-                    m('button.btn.btn-ghost', {
-                      disabled: s.pa.saving,
-                      onclick() { self.savePaycheckAmount(vnode); },
-                    }, s.pa.saving ? 'Saving…' : 'Save'),
-                  ]),
+                  m('input.form-input[type=number]', {
+                    placeholder: 'Override amount',
+                    value: s.pa.value,
+                    oninput: e => { s.pa.value = e.target.value; },
+                  }),
                   m('div.form-actions', [
                     m('button.btn.btn-ghost', {
                       onclick() { s.pf.open = false; },
