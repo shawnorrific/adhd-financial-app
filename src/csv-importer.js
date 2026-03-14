@@ -77,12 +77,10 @@ function parseCSV(text) {
 
   // Debug: log header columns and first data row so column-mapping issues are visible
   // in the Electron main-process terminal.
-  console.log('[csv-importer] columns found:', header);
   if (lines.length >= 2) {
     const firstVals = splitLine(lines[1]);
     const firstRowMap = {};
     header.forEach((h, i) => { firstRowMap[h] = firstVals[i] ?? ''; });
-    console.log('[csv-importer] first row raw:', firstRowMap);
   }
 
   const rows = [];
@@ -237,7 +235,6 @@ function importRows(rows, accountId = null, filename = null) {
       console.log('[import] ERROR:', e.message, row.transactionId, row.description);
       if (e.message && e.message.includes('UNIQUE')) {
         skipped++; // exact duplicate — silently skip
-        // console.log(row.transactionId + ' | ' + row.postDate + ' | ' + row.description + ' | ' + row.amount);
       } else {
         throw e;
       }

@@ -12,4 +12,3 @@ const dest = path.join(__dirname, '..', 'renderer', 'vendor', 'mithril.min.js');
 
 fs.mkdirSync(path.dirname(dest), { recursive: true });
 fs.copyFileSync(src, dest);
-console.log('Vendored mithril →', dest);

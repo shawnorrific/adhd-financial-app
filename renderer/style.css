@@ -560,6 +560,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   background: var(--surface);
   z-index: 1;
 }
+
+.tx-table--no-sticky th {
+  position: static;
+}
+
 .tx-table th.right { text-align: right; }
 
 .tx-table tbody tr { border-bottom: 1px solid var(--border); }

@@ -17,7 +17,6 @@ function runMigrations() {
   const sql = fs.readFileSync(path.join(__dirname, 'migrations', name), 'utf8');
   db.exec(sql);
   db.run('INSERT INTO _migrations (name) VALUES (?)', [name]);
-  console.log('[migrations] applied: 001_init.sql');
 }
 
 module.exports = runMigrations;
