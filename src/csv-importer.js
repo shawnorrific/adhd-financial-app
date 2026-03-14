@@ -3,6 +3,7 @@
 const crypto                        = require('crypto');
 const fs                            = require('fs');
 const db                            = require('../db');
+const path                          = require('path');
 const { categorize, learnCorrection } = require('./categorizer');
 
 // ── Transaction ID ────────────────────────────────────────────────────────────
@@ -38,9 +39,17 @@ function ensureTransactionIds(text, filePath) {
 
   const modified = newLines.join(eol);
 
-  if (filePath) {
-    try { fs.writeFileSync(filePath, modified, 'utf8'); } catch (_) { /* non-fatal */ }
-  }
+if (filePath) {
+  try { 
+    fs.writeFileSync(filePath, modified, 'utf8');
+    // Rename to timestamped filename
+    const dir = path.dirname(filePath);
+    const ext = path.extname(filePath);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const newPath = path.join(dir, `import_${timestamp}${ext}`);
+    fs.renameSync(filePath, newPath);
+  } catch (_) { /* non-fatal */ }
+}
 
   return modified;
 }
@@ -171,12 +180,22 @@ function importRows(rows, accountId = null, filename = null) {
   );
   const batchId = batchRun.lastInsertRowid;
 
+  // Only filter by date when a specific account is selected.  Find the most
+  // recent post_date already stored for that account; skip anything on or before it.
+  const cutoff = db.get('SELECT MAX(post_date) AS d FROM transactions')?.d ?? null;
+
   let imported = 0;
   let skipped  = 0;
 
   for (const row of rows) {
     // Skip rows whose Transaction ID is already in the database.
     if (row.transactionId && db.get('SELECT 1 FROM transactions WHERE transaction_id = ?', [row.transactionId])) {
+      skipped++;
+      continue;
+    }
+
+    // Skip rows on or before the account's most recent existing post_date.
+    if (cutoff && row.postDate <= cutoff) {
       skipped++;
       continue;
     }

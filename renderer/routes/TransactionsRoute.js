@@ -58,6 +58,10 @@
     };
   }
 
+  function blankManualDraft() {
+    return { postDate: '', description: '', amount: '', categoryId: '', accountId: '' };
+  }
+
   // ── Component ─────────────────────────────────────────────────────────────
 
   const TransactionsRoute = {
@@ -70,9 +74,12 @@
       s.loading     = true;
       s.error       = null;
       s.txAccountId = null;
-      s.editingId   = null;
-      s.draft       = blankDraft();
-      s.saving      = false;
+      s.editingId    = null;
+      s.draft        = blankDraft();
+      s.saving       = false;
+      s.addingManual = false;
+      s.manualDraft  = blankManualDraft();
+      s.savingManual = false;
       loadData(vnode);
     },
 
@@ -134,6 +141,31 @@
       }
     },
 
+    async saveManual(vnode) {
+      const s = vnode.state;
+      const d = s.manualDraft;
+      if (!d.description.trim() || !d.postDate || !d.amount) return;
+      s.savingManual = true;
+      m.redraw();
+      try {
+        await window.api.transactions.add({
+          postDate:    d.postDate,
+          description: d.description.trim(),
+          amount:      parseFloat(d.amount),
+          categoryId:  d.categoryId ? parseInt(d.categoryId, 10) : null,
+          accountId:   d.accountId  ? parseInt(d.accountId,  10) : null,
+        });
+        s.addingManual = false;
+        s.manualDraft  = blankManualDraft();
+        s.savingManual = false;
+        loadData(vnode);
+      } catch (err) {
+        s.error        = err.message || String(err);
+        s.savingManual = false;
+        m.redraw();
+      }
+    },
+
     view(vnode) {
       const s    = vnode.state;
       const self = this;
@@ -189,8 +221,68 @@
 
           m('div.tx-page-header', [
             m('h1.page-title', 'Transactions'),
-            s.txList.length > 0 && m('span.tx-count',
-              `${s.txList.length} transaction${s.txList.length !== 1 ? 's' : ''}`),
+            m('div.tx-header-right', [
+              s.txList.length > 0 && m('span.tx-count',
+                `${s.txList.length} transaction${s.txList.length !== 1 ? 's' : ''}`),
+              m('button.btn.btn-primary', {
+                onclick() {
+                  s.addingManual = !s.addingManual;
+                  if (!s.addingManual) s.manualDraft = blankManualDraft();
+                  m.redraw();
+                },
+              }, s.addingManual ? 'Cancel' : '+ Add transaction'),
+            ]),
+          ]),
+
+          s.addingManual && m('div.manual-add-form', [
+            m('h2.manual-add-title', 'Add transaction'),
+            m('div.txl-edit-fields', [
+              m('div.txl-edit-field', [
+                m('label.form-label', 'Date'),
+                m('input.form-input[type=date]', {
+                  value:   s.manualDraft.postDate,
+                  oninput: e => { s.manualDraft.postDate = e.target.value; },
+                }),
+              ]),
+              m('div.txl-edit-field', [
+                m('label.form-label', 'Description'),
+                m('input.form-input', {
+                  value:   s.manualDraft.description,
+                  oninput: e => { s.manualDraft.description = e.target.value; },
+                }),
+              ]),
+              m('div.txl-edit-field', [
+                m('label.form-label', 'Amount'),
+                m('input.form-input[type=number][step=0.01]', {
+                  placeholder: 'negative = expense',
+                  value:       s.manualDraft.amount,
+                  oninput:     e => { s.manualDraft.amount = e.target.value; },
+                }),
+              ]),
+              m('div.txl-edit-field', [
+                m('label.form-label', 'Category'),
+                m('select.cat-select', {
+                  value:    s.manualDraft.categoryId,
+                  onchange: e => { s.manualDraft.categoryId = e.target.value; },
+                }, catOptions),
+              ]),
+              m('div.txl-edit-field', [
+                m('label.form-label', 'Account'),
+                m('select.cat-select', {
+                  value:    s.manualDraft.accountId,
+                  onchange: e => { s.manualDraft.accountId = e.target.value; },
+                }, acctOptions),
+              ]),
+            ]),
+            m('div.form-actions', [
+              m('button.btn.btn-ghost', {
+                onclick() { s.addingManual = false; s.manualDraft = blankManualDraft(); m.redraw(); },
+              }, 'Cancel'),
+              m('button.btn.btn-primary', {
+                disabled: !s.manualDraft.description.trim() || !s.manualDraft.postDate || !s.manualDraft.amount || s.savingManual,
+                onclick() { self.saveManual(vnode); },
+              }, s.savingManual ? 'Saving…' : 'Save'),
+            ]),
           ]),
 
           accountPills(),
