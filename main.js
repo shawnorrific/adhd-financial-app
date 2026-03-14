@@ -244,6 +244,19 @@ ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId,
   return { ok: true };
 });
 
+// ── IPC: transaction add (manual) ────────────────────────────────────────────
+ipcMain.handle('transactions:add', (_, { postDate, description, amount, categoryId, accountId }) => {
+  db.run(
+    `INSERT INTO transactions
+       (post_date, description, amount, category_id, account_id,
+        is_user_categorized, source)
+     VALUES (?, ?, ?, ?, ?, 1, 'manual')`,
+    [postDate, description.trim(), parseFloat(amount),
+     categoryId || null, accountId || null]
+  );
+  return { ok: true };
+});
+
 // ── IPC: settings ─────────────────────────────────────────────────────────────
 ipcMain.handle('settings:get', (_, key) =>
   db.get('SELECT value FROM settings WHERE key = ?', [key])?.value ?? null);
