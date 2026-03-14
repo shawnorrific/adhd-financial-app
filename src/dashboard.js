@@ -96,7 +96,6 @@ function getSummary(accountId = null) {
     ) t ON t.account_id = a.id
     ORDER BY a.id
   `);
-  console.log('[dashboard] accountBalances:', JSON.stringify(accountBalances));
 
   // ── Balance ────────────────────────────────────────────────────────────────
   const latestTx = db.get(`
@@ -108,7 +107,6 @@ function getSummary(accountId = null) {
     LIMIT  1
   `, acctParam);
   const balance = latestTx?.balance ?? null;
-  console.log('[dashboard] latestTx:', JSON.stringify(latestTx), '→ balance:', balance);
 
   // ── Paycheck ───────────────────────────────────────────────────────────────
   const paycheckFrequency = getSetting('paycheck_frequency');
@@ -168,9 +166,6 @@ function getSummary(accountId = null) {
       }
     }
   }
-
-  console.log('[dashboard] paycheckFrequency:', paycheckFrequency, 'paycheckLastDate:', paycheckLastDate);
-  console.log('[dashboard] bills count:', bills.length, bills.map(b => b.name));
 
   // Estimate paycheck size from average of recent Income transactions
   const incomeRow = db.get(`
@@ -241,7 +236,6 @@ function getSummary(accountId = null) {
     LIMIT  8
   `, [monthStart, ...acctParam]);
 
-  console.log('[dashboard] → status:', status, 'cushion:', cushion, 'statusMessage:', statusMessage);
 
   return {
     balance,

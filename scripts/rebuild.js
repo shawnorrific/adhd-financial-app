@@ -14,7 +14,6 @@ const bsqliteDir = path.join(root, 'node_modules', 'better-sqlite3');
 const { devDependencies } = require(path.join(root, 'package.json'));
 const electronVersion = devDependencies.electron.replace(/[^0-9.]/g, '');
 
-console.log(`[rebuild] fetching better-sqlite3 prebuilt for Electron ${electronVersion}…`);
 execFileSync(
   process.execPath,
   [prebuildInstall, '--runtime', 'electron', '--target', electronVersion, '--verbose'],
