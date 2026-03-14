@@ -238,7 +238,7 @@
             ]),
 
             m('div.table-scroll',
-              m('table.tx-table', [
+              m('table.tx-table.tx-table--no-sticky', [
                 m('thead', m('tr', [
                   m('th', 'Date'),
                   m('th', 'Description'),
