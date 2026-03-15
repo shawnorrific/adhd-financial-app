@@ -119,7 +119,7 @@ if (lastKnownBalance !== null && lastKnownDate !== null) {
     WHERE  post_date > ?
     ${acctWhere}
   `, [lastKnownDate, ...acctParam])?.total || 0;
-  
+
   balance = lastKnownBalance + adjustment;
 }
 
@@ -181,6 +181,45 @@ if (lastKnownBalance !== null && lastKnownDate !== null) {
       }
     }
   }
+  const billsAfterNextTotal = upcomingBillsTotal - billsBeforeNextTotal;
+
+  // ── Avg daily discretionary spend (last 6 months, split by pay period) ──────
+  const discTx = db.all(`
+    SELECT t.post_date, ABS(t.amount) AS amt
+    FROM   transactions t
+    LEFT JOIN categories c ON c.id = t.category_id
+    WHERE  t.amount < 0
+      AND  t.post_date >= date('now', '-6 months')
+      AND  (c.name IS NULL OR c.name NOT IN (
+             'Transfer', 'Credit Card Payment', 'Income', 'ATM / Cash'
+           ))
+      AND  LOWER(t.description) NOT IN (
+             SELECT LOWER(name) FROM bills WHERE is_active = 1
+           )
+      ${acctWhere}
+  `, acctParam);
+
+  let p1Total = 0, p1Days = 0;
+  let p2Total = 0, p2Days = 0;
+  const seenPeriods = new Set();
+  for (const row of discTx) {
+    const [y, mo, d] = row.post_date.split('-').map(Number);
+    const isP1 = d <= 15;
+    const key  = `${y}-${mo}-${isP1 ? 1 : 2}`;
+    if (!seenPeriods.has(key)) {
+      seenPeriods.add(key);
+      if (isP1) {
+        p1Days += 15;
+      } else {
+        p2Days += new Date(y, mo, 0).getDate() - 15;
+      }
+    }
+    if (isP1) p1Total += row.amt;
+    else       p2Total += row.amt;
+  }
+  const avgDailyP1 = p1Days > 0 ? p1Total / p1Days : 0;
+  const avgDailyP2 = p2Days > 0 ? p2Total / p2Days : 0;
+  const avgDailyDiscretionary = new Date().getDate() <= 15 ? avgDailyP1 : avgDailyP2;
 
   // Estimate paycheck size from average of recent Income transactions
 const paycheckAmountOverride = getSetting('paycheck_amount') || '';
@@ -230,6 +269,13 @@ if (parseFloat(paycheckAmountOverride) > 0) {
   }
 }
 
+  const daysUntilNextNext = nextNextPaycheckDate
+    ? Math.round((new Date(nextNextPaycheckDate + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000)
+    : null;
+  const estimatedBalance = (estimatedPaycheck != null && daysUntilNextNext != null && balance !== null)
+    ? balance + estimatedPaycheck - upcomingBillsTotal - avgDailyDiscretionary * daysUntilNextNext
+    : null;
+
   // ── "Am I okay right now?" ─────────────────────────────────────────────────
   const buffer = parseFloat(getSetting('balance_buffer') || '200');
   let status        = 'unknown';
@@ -244,12 +290,8 @@ if (parseFloat(paycheckAmountOverride) > 0) {
       status        = 'setup';
       statusMessage = 'Add your recurring bills';
     } else {
-      // Pre-paycheck: can I cover bills before my next paycheck arrives?
-      // Post-paycheck: after the paycheck lands, can I cover everything through the one after?
-      // Show whichever is lower — the most honest picture.
-      const preCushion = balance - billsBeforeNextTotal;
-      const postCushion = balance + (estimatedPaycheck ?? 0) - upcomingBillsTotal;
-      cushion = Math.min(preCushion, postCushion);
+      const estimatedDiscretionarySpend = avgDailyDiscretionary * (daysUntilPaycheck ?? 0);
+      cushion = balance - billsBeforeNextTotal;
       if (cushion >= buffer) {
         status        = 'ok';
         statusMessage = "You're okay";
@@ -305,6 +347,13 @@ if (parseFloat(paycheckAmountOverride) > 0) {
     estimatedPaycheck,
     paycheckAmountOverride: paycheckAmountOverride || '',
     cushion,
+    billsBeforeNextTotal,
+    billsAfterNextTotal,
+    nextNextPaycheckDate,
+    daysUntilNextNext,
+    estimatedBalance,
+    avgDailyDiscretionary,
+    estimatedDiscretionarySpend: avgDailyDiscretionary * (daysUntilPaycheck ?? 0),
     buffer,
     status,               // 'unknown' | 'setup' | 'ok' | 'tight' | 'danger'
     statusMessage,

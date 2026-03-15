@@ -209,6 +209,97 @@
         ));
       }
 
+      function payCycleOutlook() {
+        if (!sum || !sum.nextPaycheckDate) return null;
+
+        const daysLeft       = sum.daysUntilPaycheck ?? 0;
+        const estSpendBefore = sum.avgDailyDiscretionary * daysLeft;
+        const estSpendCycle  = sum.daysUntilNextNext != null
+          ? sum.avgDailyDiscretionary * sum.daysUntilNextNext
+          : null;
+        const heavyBills = sum.estimatedPaycheck != null
+          && sum.billsAfterNextTotal > sum.estimatedPaycheck * 0.4;
+
+        return m('div.outlook-section', [
+          m('h2.section-title', 'Pay cycle outlook'),
+          m('div.outlook-grid', [
+
+            // ── Panel 1: until next paycheck ──────────────────────────────────
+            m('div.outlook-card', [
+              m('div.outlook-card-header', [
+                m('span.outlook-card-title',
+                  daysLeft === 0 ? 'Payday is today' : `Until ${fmtDate(sum.nextPaycheckDate)}`),
+                daysLeft > 0 && m('span.outlook-card-sub',
+                  `${daysLeft} day${daysLeft === 1 ? '' : 's'}`),
+              ]),
+              m('div.outlook-rows', [
+                m('div.outlook-row', [
+                  m('span.outlook-row-label', 'Balance'),
+                  m('span.outlook-row-value', fmtMoney(sum.balance)),
+                ]),
+                sum.billsBeforeNextTotal > 0 && m('div.outlook-row', [
+                  m('span.outlook-row-label', 'Bills before paycheck'),
+                  m('span.outlook-row-value.red', '\u2212' + fmtMoney(sum.billsBeforeNextTotal)),
+                ]),
+                m('div.outlook-row.outlook-row--divider.outlook-row--total', [
+                  m('span.outlook-row-label', 'Free to spend'),
+                  m('span.outlook-row-value', {
+                    class: (sum.cushion ?? 0) >= 0 ? 'green' : 'red',
+                  }, fmtMoney(sum.cushion)),
+                ]),
+                daysLeft > 0 && estSpendBefore > 0 && m('div.outlook-row.outlook-spending-hint', [
+                  m('span.outlook-row-label', 'Typical spending'),
+                  m('span.outlook-row-value', '\u2248\u2212' + fmtMoney(estSpendBefore)),
+                ]),
+              ]),
+            ]),
+
+            // ── Panel 2: full cycle after next paycheck ────────────────────────
+            sum.nextNextPaycheckDate && m('div.outlook-card', [
+              m('div.outlook-card-header', [
+                m('span.outlook-card-title', `After ${fmtDate(sum.nextPaycheckDate)}`),
+                m('span.outlook-card-sub', `\u2192 ${fmtDate(sum.nextNextPaycheckDate)}`),
+              ]),
+              m('div.outlook-rows', [
+                m('div.outlook-row', [
+                  m('span.outlook-row-label', 'Balance'),
+                  m('span.outlook-row-value', fmtMoney(sum.balance)),
+                ]),
+                sum.estimatedPaycheck != null && m('div.outlook-row', [
+                  m('span.outlook-row-label', 'Est. paycheck'),
+                  m('span.outlook-row-value.green', '+' + fmtMoney(sum.estimatedPaycheck)),
+                ]),
+                sum.upcomingBillsTotal > 0 && m('div.outlook-row', [
+                  m('span.outlook-row-label', [
+                    'All upcoming bills',
+                    heavyBills && m('span.outlook-heavy-tag', ' heavy'),
+                  ]),
+                  m('span.outlook-row-value.red', '\u2212' + fmtMoney(sum.upcomingBillsTotal)),
+                ]),
+                estSpendCycle != null && estSpendCycle > 0 && m('div.outlook-row', [
+                  m('span.outlook-row-label', `Est. spending (${sum.daysUntilNextNext}d)`),
+                  m('span.outlook-row-value', '\u2248\u2212' + fmtMoney(estSpendCycle)),
+                ]),
+                sum.estimatedBalance != null
+                  ? m('div.outlook-row.outlook-row--divider.outlook-row--total', [
+                      m('span.outlook-row-label', 'Projected balance'),
+                      m('span.outlook-row-value', {
+                        class: sum.estimatedBalance >= 0 ? 'green' : 'red',
+                      }, fmtMoney(sum.estimatedBalance)),
+                    ])
+                  : m('p.outlook-no-data', 'Set paycheck amount for full projection'),
+              ]),
+              heavyBills && m('div.outlook-warning', [
+                '\u26A0\uFE0F ',
+                fmtMoney(sum.billsAfterNextTotal),
+                ` in bills after ${fmtDate(sum.nextPaycheckDate)} \u2014 plan ahead`,
+              ]),
+            ]),
+
+          ]),
+        ]);
+      }
+
       return m('div.dashboard-page', [
 
         // ── Nav ──────────────────────────────────────────────────────────────
@@ -364,6 +455,8 @@
               ]),
 
             ]), // end .stat-cards
+
+            payCycleOutlook(),
 
             // ── Monthly summary tiles ────────────────────────────────────────
             m('div.monthly-row', [
