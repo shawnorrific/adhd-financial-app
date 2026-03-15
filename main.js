@@ -423,9 +423,6 @@ ipcMain.handle('danger:wipe', (_, target) => {
   if (target === 'accounts' || target === 'all') {
     db.run('DELETE FROM accounts');
   }
-  if (target === 'all') {
-    db.run("DELETE FROM _migrations WHERE name != '001_init.sql'");
-  }
   return { ok: true };
 });
 
