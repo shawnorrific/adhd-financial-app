@@ -261,7 +261,6 @@
                               s.balanceError = null;
                             },
                           }, 'Set balance'),
-                            // ↓ ADD THIS
                           account.manual_balance != null && m('button.btn.btn-ghost.btn-sm', {
                             title: 'Clear manual balance',
                             async onclick() {
@@ -269,7 +268,6 @@
                               loadData(vnode);
                             },
                           }, 'Clear balance'),
-                          // ↑ END ADD
                           m('button.btn.btn-ghost.icon-btn', {
                             title: 'Edit account',
                             onclick() { self.startEdit(vnode, account); },

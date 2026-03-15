@@ -41,7 +41,7 @@ contextBridge.exposeInMainWorld('api', {
 
   bills: {
     list:   (opts) => ipcRenderer.invoke('bills:list',   opts),
-    detect: ()     => ipcRenderer.invoke('bills:detect'),
+    detect: (opts) => ipcRenderer.invoke('bills:detect', opts),
     save:   bill   => ipcRenderer.invoke('bills:save',   bill),
     delete: id     => ipcRenderer.invoke('bills:delete', id),
   },

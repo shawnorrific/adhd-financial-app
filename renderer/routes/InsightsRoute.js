@@ -44,14 +44,10 @@
       s.accounts = accounts;
       s.loading  = false;
 
-      if (summary.balance !== null) {
-        window.api.bills.detect().then(detected => {
-          s.detected = detected;
-          m.redraw();
-        });
-      } else {
-        s.detected = [];
-      }
+      window.api.bills.detect({ accountId }).then(detected => {
+        s.detected = detected;
+        m.redraw();
+      });
 
       m.redraw();
     }).catch(err => {

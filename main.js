@@ -210,8 +210,10 @@ ipcMain.handle('bills:list', (_, { accountId } = {}) => {
   `);
 });
 
-ipcMain.handle('bills:detect', () =>
-  db.all(`
+ipcMain.handle('bills:detect', (_, { accountId } = {}) => {
+  const accountFilter = accountId ? 'AND t.account_id = ?' : '';
+  const params = accountId ? [accountId] : [];
+  return db.all(`
     SELECT
       t.description,
       t.category_id,
@@ -225,12 +227,14 @@ ipcMain.handle('bills:detect', () =>
     WHERE  t.amount < 0
       AND  t.post_date >= date('now', '-95 days')
       AND  (c.name IS NULL OR c.name NOT IN ('Income', 'Transfer', 'ATM / Cash'))
+      ${accountFilter}
     GROUP  BY t.description
     HAVING COUNT(*) >= 2
       AND  (MAX(ABS(t.amount)) - MIN(ABS(t.amount))) < 15
     ORDER  BY avg_amount DESC
     LIMIT  20
-  `));
+  `, params);
+});
 
 ipcMain.handle('bills:save', (_, bill) => {
   if (bill.id) {
@@ -282,7 +286,7 @@ ipcMain.handle('transactions:add', (_, { postDate, description, amount, category
   if (accountId) {
     const acct = db.get(
       'SELECT manual_balance, manual_balance_date FROM accounts WHERE id = ?', [accountId]);
-    if (acct?.manual_balance != null && postDate >= acct.manual_balance_date) {
+    if (acct?.manual_balance != null) {
       priorBalance  = getAccountBalance(accountId);
       shouldAdvance = priorBalance !== null;
     }
@@ -297,22 +301,13 @@ ipcMain.handle('transactions:add', (_, { postDate, description, amount, category
      categoryId || null, accountId || null]
   );
 
-
-  // Update manual balance if one exists for this account
-  if (accountId) {
-    const acct = db.get('SELECT manual_balance FROM accounts WHERE id = ?', [accountId]);
-    if (acct?.manual_balance != null) {
-      db.run(
-        'UPDATE accounts SET manual_balance = manual_balance + ? WHERE id = ?',
-        [parseFloat(amount), accountId]
-      );
-    }
-  }
-
   if (shouldAdvance) {
+    const acct = db.get(
+      'SELECT manual_balance_date FROM accounts WHERE id = ?', [accountId]);
+    const newAnchor = postDate > acct.manual_balance_date ? postDate : acct.manual_balance_date;
     db.run(
       'UPDATE accounts SET manual_balance = ?, manual_balance_date = ? WHERE id = ?',
-      [priorBalance + parseFloat(amount), postDate, accountId]
+      [priorBalance + parseFloat(amount), newAnchor, accountId]
     );
   }
 
@@ -420,6 +415,7 @@ ipcMain.handle('danger:wipe', (_, target) => {
   if (target === 'transactions' || target === 'all') {
     db.run('DELETE FROM transactions');
     db.run('DELETE FROM import_batches');
+    db.run('UPDATE accounts SET manual_balance = NULL, manual_balance_date = NULL');
   }
   if (target === 'bills' || target === 'all') {
     db.run('DELETE FROM bills');
