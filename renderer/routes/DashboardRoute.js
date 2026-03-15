@@ -348,8 +348,10 @@
                 ]),
 
                 // Setup / unknown nudge
-                (sum.status === 'setup' || sum.status === 'unknown' || sum.statusMessage) &&
+                (sum.status === 'setup' || sum.status === 'unknown') &&
                   m('div.status-detail.muted', sum.statusMessage),
+                sum.noBillsNudge &&
+                  m('div.status-detail.muted', 'Add your bills for a more accurate picture'),
               ]),
             ]),
 

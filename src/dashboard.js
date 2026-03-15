@@ -307,9 +307,9 @@ if (parseFloat(paycheckAmountOverride) > 0) {
       status        = 'setup';
       statusMessage = 'Set up your paycheck schedule';
     } else if (bills.length === 0) {
-        cushion = balance;
-        status = cushion >= buffer ? 'ok' : cushion >= 0 ? 'tight' : 'danger';
-        statusMessage = 'Add your bills for a more accurate picture';
+      cushion = balance;
+      status = cushion >= buffer ? 'ok' : cushion >= 0 ? 'tight' : 'danger';
+      statusMessage = status === 'ok' ? "You're okay" : status === 'tight' ? 'Tight but covered' : 'Watch your spending';
     } else {
       const estimatedDiscretionarySpend = avgDailyDiscretionary * (daysUntilPaycheck ?? 0);
       cushion = balance - billsBeforeNextTotal;
@@ -378,6 +378,7 @@ if (parseFloat(paycheckAmountOverride) > 0) {
     buffer,
     status,               // 'unknown' | 'setup' | 'ok' | 'tight' | 'danger'
     statusMessage,
+    noBillsNudge: bills.length === 0 && balance !== null && paycheckLastDate,
     monthlySpend,
     monthlyIncome,
     topCategories,
