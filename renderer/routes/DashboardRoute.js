@@ -72,14 +72,10 @@
       s.pa.value = summary.paycheckAmountOverride || '';
 
       // Always detect recurring charges so the list stays available for adding more
-      if (summary.balance !== null) {
         window.api.bills.detect().then(detected => {
           s.detected = detected;
           m.redraw();
         });
-      } else {
-        s.detected = [];
-      }
 
       m.redraw();
     }).catch(err => {
@@ -354,6 +350,8 @@
                 // Setup / unknown nudge
                 (sum.status === 'setup' || sum.status === 'unknown') &&
                   m('div.status-detail.muted', sum.statusMessage),
+                sum.noBillsNudge &&
+                  m('div.status-detail.muted', 'Add your bills for a more accurate picture'),
               ]),
             ]),
 
