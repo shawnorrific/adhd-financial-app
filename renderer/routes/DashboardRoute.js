@@ -72,14 +72,10 @@
       s.pa.value = summary.paycheckAmountOverride || '';
 
       // Always detect recurring charges so the list stays available for adding more
-      if (summary.balance !== null) {
         window.api.bills.detect().then(detected => {
           s.detected = detected;
           m.redraw();
         });
-      } else {
-        s.detected = [];
-      }
 
       m.redraw();
     }).catch(err => {
