@@ -98,15 +98,30 @@ function getSummary(accountId = null) {
   `);
 
   // ── Balance ────────────────────────────────────────────────────────────────
-  const latestTx = db.get(`
-    SELECT balance, post_date
-    FROM   transactions
-    WHERE  balance IS NOT NULL
+const latestTx = db.get(`
+  SELECT balance, post_date
+  FROM   transactions
+  WHERE  balance IS NOT NULL
     ${acctWhere}
-    ORDER  BY post_date DESC, id DESC
-    LIMIT  1
-  `, acctParam);
-  const balance = latestTx?.balance ?? null;
+  ORDER  BY post_date DESC, balance ASC
+  LIMIT  1
+`, acctParam);
+
+const lastKnownBalance = latestTx?.balance ?? null;
+const lastKnownDate = latestTx?.post_date ?? null;
+
+let balance = lastKnownBalance;
+
+if (lastKnownBalance !== null && lastKnownDate !== null) {
+  const adjustment = db.get(`
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM   transactions
+    WHERE  post_date > ?
+    ${acctWhere}
+  `, [lastKnownDate, ...acctParam])?.total || 0;
+  
+  balance = lastKnownBalance + adjustment;
+}
 
   // ── Paycheck ───────────────────────────────────────────────────────────────
   const paycheckFrequency = getSetting('paycheck_frequency');
@@ -232,7 +247,7 @@ if (parseFloat(paycheckAmountOverride) > 0) {
       // Pre-paycheck: can I cover bills before my next paycheck arrives?
       // Post-paycheck: after the paycheck lands, can I cover everything through the one after?
       // Show whichever is lower — the most honest picture.
-      const preCushion  = balance - billsBeforeNextTotal;
+      const preCushion = balance - billsBeforeNextTotal;
       const postCushion = balance + (estimatedPaycheck ?? 0) - upcomingBillsTotal;
       cushion = Math.min(preCushion, postCushion);
       if (cushion >= buffer) {
