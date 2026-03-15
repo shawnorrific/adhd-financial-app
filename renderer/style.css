@@ -1407,3 +1407,93 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 
 .dz-wipe-label { font-size: 13px; color: var(--text); font-weight: 500; }
 .dz-wipe-detail { font-size: 11px; color: var(--muted); line-height: 1.3; }
+
+/* ── Pay cycle outlook ───────────────────────────────────────────────────── */
+.outlook-section { margin-bottom: 24px; }
+
+.outlook-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.outlook-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.outlook-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.outlook-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.outlook-card-sub { font-size: 12px; color: var(--muted); }
+
+.outlook-rows { display: flex; flex-direction: column; gap: 7px; }
+
+.outlook-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.outlook-row--divider {
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+  margin-top: 3px;
+}
+
+.outlook-row--total { font-weight: 700; font-size: 14px; }
+
+.outlook-spending-hint { opacity: 0.6; margin-top: 2px; }
+
+.outlook-row-label { color: var(--muted); flex: 1; }
+.outlook-row-value { font-family: var(--mono); white-space: nowrap; }
+.outlook-row-value.green { color: var(--green); }
+.outlook-row-value.red   { color: var(--red); }
+
+.outlook-heavy-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--yellow);
+  background: rgba(241,196,15,.12);
+  border: 1px solid rgba(241,196,15,.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.outlook-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: rgba(241,196,15,.08);
+  border: 1px solid rgba(241,196,15,.25);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--yellow);
+  line-height: 1.5;
+}
+
+.outlook-no-data { font-size: 12px; color: var(--muted); margin-top: 6px; }

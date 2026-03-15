@@ -181,6 +181,7 @@ if (lastKnownBalance !== null && lastKnownDate !== null) {
       }
     }
   }
+  const billsAfterNextTotal = upcomingBillsTotal - billsBeforeNextTotal;
 
   // ── Avg daily discretionary spend (last 6 months, split by pay period) ──────
   const discTx = db.all(`
@@ -268,6 +269,13 @@ if (parseFloat(paycheckAmountOverride) > 0) {
   }
 }
 
+  const daysUntilNextNext = nextNextPaycheckDate
+    ? Math.round((new Date(nextNextPaycheckDate + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000)
+    : null;
+  const estimatedBalance = (estimatedPaycheck != null && daysUntilNextNext != null && balance !== null)
+    ? balance + estimatedPaycheck - upcomingBillsTotal - avgDailyDiscretionary * daysUntilNextNext
+    : null;
+
   // ── "Am I okay right now?" ─────────────────────────────────────────────────
   const buffer = parseFloat(getSetting('balance_buffer') || '200');
   let status        = 'unknown';
@@ -283,7 +291,7 @@ if (parseFloat(paycheckAmountOverride) > 0) {
       statusMessage = 'Add your recurring bills';
     } else {
       const estimatedDiscretionarySpend = avgDailyDiscretionary * (daysUntilPaycheck ?? 0);
-      cushion = balance - billsBeforeNextTotal - estimatedDiscretionarySpend;
+      cushion = balance - billsBeforeNextTotal;
       if (cushion >= buffer) {
         status        = 'ok';
         statusMessage = "You're okay";
@@ -339,6 +347,11 @@ if (parseFloat(paycheckAmountOverride) > 0) {
     estimatedPaycheck,
     paycheckAmountOverride: paycheckAmountOverride || '',
     cushion,
+    billsBeforeNextTotal,
+    billsAfterNextTotal,
+    nextNextPaycheckDate,
+    daysUntilNextNext,
+    estimatedBalance,
     avgDailyDiscretionary,
     estimatedDiscretionarySpend: avgDailyDiscretionary * (daysUntilPaycheck ?? 0),
     buffer,
