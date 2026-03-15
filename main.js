@@ -118,6 +118,28 @@ ipcMain.handle('transaction:recategorize', (_, { id, categoryId }) => {
 ipcMain.handle('categories:list', () =>
   db.all('SELECT * FROM categories ORDER BY name'));
 
+// ── Helper: compute current balance for one account ───────────────────────────
+function getAccountBalance(accountId) {
+  const acct = db.get(
+    'SELECT manual_balance, manual_balance_date FROM accounts WHERE id = ?', [accountId]);
+  const latestTx = db.get(`
+    SELECT balance, post_date FROM transactions
+    WHERE  balance IS NOT NULL AND account_id = ?
+    ORDER  BY post_date DESC LIMIT 1`, [accountId]);
+
+  const useManual  = acct?.manual_balance != null &&
+    (latestTx == null || acct.manual_balance_date >= latestTx.post_date);
+  const anchor     = useManual ? acct.manual_balance      : (latestTx?.balance   ?? null);
+  const anchorDate = useManual ? acct.manual_balance_date : (latestTx?.post_date ?? null);
+  if (anchor == null) return null;
+
+  const adj = db.get(`
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM   transactions
+    WHERE  account_id = ? AND post_date > ?`, [accountId, anchorDate])?.total || 0;
+  return anchor + adj;
+}
+
 // ── IPC: accounts ─────────────────────────────────────────────────────────────
 ipcMain.handle('accounts:list', () =>
   db.all('SELECT * FROM accounts ORDER BY id'));
@@ -145,6 +167,14 @@ ipcMain.handle('accounts:delete', (_, id) => {
     return { ok: false, error: `${used.n} transaction(s) are linked to this account` };
   }
   db.run('DELETE FROM accounts WHERE id = ?', [id]);
+  return { ok: true };
+});
+
+ipcMain.handle('accounts:setBalance', (_, { id, balance, date }) => {
+  db.run(
+    'UPDATE accounts SET manual_balance = ?, manual_balance_date = ? WHERE id = ?',
+    [parseFloat(balance), date, id]
+  );
   return { ok: true };
 });
 
@@ -246,6 +276,18 @@ ipcMain.handle('transactions:update', (_, { id, description, amount, categoryId,
 
 // ── IPC: transaction add (manual) ────────────────────────────────────────────
 ipcMain.handle('transactions:add', (_, { postDate, description, amount, categoryId, accountId }) => {
+  // Snapshot balance before insert so we don't double-count the new transaction
+  let priorBalance  = null;
+  let shouldAdvance = false;
+  if (accountId) {
+    const acct = db.get(
+      'SELECT manual_balance, manual_balance_date FROM accounts WHERE id = ?', [accountId]);
+    if (acct?.manual_balance != null && postDate >= acct.manual_balance_date) {
+      priorBalance  = getAccountBalance(accountId);
+      shouldAdvance = priorBalance !== null;
+    }
+  }
+
   db.run(
     `INSERT INTO transactions
        (post_date, description, amount, category_id, account_id,
@@ -254,6 +296,14 @@ ipcMain.handle('transactions:add', (_, { postDate, description, amount, category
     [postDate, description.trim(), parseFloat(amount),
      categoryId || null, accountId || null]
   );
+
+  if (shouldAdvance) {
+    db.run(
+      'UPDATE accounts SET manual_balance = ?, manual_balance_date = ? WHERE id = ?',
+      [priorBalance + parseFloat(amount), postDate, accountId]
+    );
+  }
+
   return { ok: true };
 });
 
