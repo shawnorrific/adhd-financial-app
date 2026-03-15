@@ -83,9 +83,10 @@ function getSummary(accountId = null) {
   const acctParam  = accountId ? [accountId]          : [];
 
   // ── Per-account balances (always returned for the account strip) ────────────
-  const accountBalances = db.all(`
+  const rawAccounts = db.all(`
     SELECT a.id, a.name, a.type, a.color,
-           t.balance AS latest_balance, t.post_date AS balance_date
+           a.manual_balance, a.manual_balance_date,
+           t.balance AS tx_balance, t.post_date AS tx_balance_date
     FROM   accounts a
     LEFT JOIN (
       SELECT account_id, balance, post_date
@@ -97,31 +98,50 @@ function getSummary(accountId = null) {
     ORDER BY a.id
   `);
 
+  const accountBalances = rawAccounts.map(a => {
+    const useManual = a.manual_balance != null &&
+      (a.tx_balance == null || a.manual_balance_date >= a.tx_balance_date);
+    return {
+      ...a,
+      latest_balance: useManual ? a.manual_balance      : a.tx_balance,
+      balance_date:   useManual ? a.manual_balance_date : a.tx_balance_date,
+      balance_source: useManual ? 'manual'              : 'import',
+    };
+  });
+
   // ── Balance ────────────────────────────────────────────────────────────────
-const latestTx = db.get(`
-  SELECT balance, post_date
-  FROM   transactions
-  WHERE  balance IS NOT NULL
-    ${acctWhere}
-  ORDER  BY post_date DESC, balance ASC
-  LIMIT  1
-`, acctParam);
-
-const lastKnownBalance = latestTx?.balance ?? null;
-const lastKnownDate = latestTx?.post_date ?? null;
-
-let balance = lastKnownBalance;
-
-if (lastKnownBalance !== null && lastKnownDate !== null) {
-  const adjustment = db.get(`
-    SELECT COALESCE(SUM(amount), 0) AS total
+  const latestTx = db.get(`
+    SELECT balance, post_date
     FROM   transactions
-    WHERE  post_date > ?
-    ${acctWhere}
-  `, [lastKnownDate, ...acctParam])?.total || 0;
+    WHERE  balance IS NOT NULL
+      ${acctWhere}
+    ORDER  BY post_date DESC, balance ASC
+    LIMIT  1
+  `, acctParam);
 
-  balance = lastKnownBalance + adjustment;
-}
+  let manualBalance = null, manualBalanceDate = null;
+  if (accountId) {
+    const acct = db.get(
+      'SELECT manual_balance, manual_balance_date FROM accounts WHERE id = ?', [accountId]);
+    manualBalance     = acct?.manual_balance      ?? null;
+    manualBalanceDate = acct?.manual_balance_date ?? null;
+  }
+
+  const useManual  = manualBalance !== null &&
+    (latestTx == null || manualBalanceDate >= latestTx.post_date);
+  const anchor     = useManual ? manualBalance     : (latestTx?.balance   ?? null);
+  const anchorDate = useManual ? manualBalanceDate : (latestTx?.post_date ?? null);
+
+  let balance = anchor;
+  if (anchor !== null && anchorDate !== null) {
+    const adjustment = db.get(`
+      SELECT COALESCE(SUM(amount), 0) AS total
+      FROM   transactions
+      WHERE  post_date > ?
+      ${acctWhere}
+    `, [anchorDate, ...acctParam])?.total || 0;
+    balance = anchor + adjustment;
+  }
 
   // ── Paycheck ───────────────────────────────────────────────────────────────
   const paycheckFrequency = getSetting('paycheck_frequency');
@@ -334,7 +354,7 @@ if (parseFloat(paycheckAmountOverride) > 0) {
 
   return {
     balance,
-    balanceDate:        latestTx?.post_date ?? null,
+    balanceDate:        anchorDate ?? null,
     accountBalances,
     paycheckFrequency,
     paycheckLastDate,

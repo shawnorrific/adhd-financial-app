@@ -12,11 +12,14 @@ db.exec(`
 `);
 
 function runMigrations() {
-  const name = '001_init.sql';
-  if (db.get('SELECT id FROM _migrations WHERE name = ?', [name])) return;
-  const sql = fs.readFileSync(path.join(__dirname, 'migrations', name), 'utf8');
-  db.exec(sql);
-  db.run('INSERT INTO _migrations (name) VALUES (?)', [name]);
+  const dir   = path.join(__dirname, 'migrations');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+  for (const name of files) {
+    if (db.get('SELECT id FROM _migrations WHERE name = ?', [name])) continue;
+    const sql = fs.readFileSync(path.join(dir, name), 'utf8');
+    db.exec(sql);
+    db.run('INSERT INTO _migrations (name) VALUES (?)', [name]);
+  }
 }
 
 module.exports = runMigrations;

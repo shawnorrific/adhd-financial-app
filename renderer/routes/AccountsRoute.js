@@ -48,6 +48,9 @@
       s.editId     = null;
       s.editForm   = defaultForm();
       s.editSaving = false;
+      s.settingBalanceFor = null;
+      s.balanceDraft      = { amount: '', date: new Date().toISOString().slice(0, 10) };
+      s.balanceError      = null;
       loadData(vnode);
     },
 
@@ -95,6 +98,15 @@
       });
       s.editSaving = false;
       s.editId     = null;
+      loadData(vnode);
+    },
+
+    async saveBalance(vnode, account) {
+      const s   = vnode.state;
+      const val = parseFloat(s.balanceDraft.amount);
+      if (isNaN(val) || !s.balanceDraft.date) return;
+      await window.api.accounts.setBalance({ id: account.id, balance: val, date: s.balanceDraft.date });
+      s.settingBalanceFor = null;
       loadData(vnode);
     },
 
@@ -230,9 +242,33 @@
                             account.institution
                               ? m('span.bill-cat', ` · ${account.institution}`)
                               : null,
+                            account.manual_balance != null
+                              ? m('span.bill-cat',
+                                  ` · Balance: $${account.manual_balance.toFixed(2)} as of ${account.manual_balance_date}`)
+                              : null,
                           ]),
                         ]),
                         m('div.bill-card-actions', [
+                          m('button.btn.btn-ghost.btn-sm', {
+                            title: 'Set current balance',
+                            onclick() {
+                              s.settingBalanceFor = account.id;
+                              s.balanceDraft = {
+                                amount: account.manual_balance != null ? String(account.manual_balance) : '',
+                                date:   new Date().toISOString().slice(0, 10),
+                              };
+                              s.balanceError = null;
+                            },
+                          }, 'Set balance'),
+                            // ↓ ADD THIS
+                          account.manual_balance != null && m('button.btn.btn-ghost.btn-sm', {
+                            title: 'Clear manual balance',
+                            async onclick() {
+                              await window.api.accounts.clearBalance(account.id);
+                              loadData(vnode);
+                            },
+                          }, 'Clear balance'),
+                          // ↑ END ADD
                           m('button.btn.btn-ghost.icon-btn', {
                             title: 'Edit account',
                             onclick() { self.startEdit(vnode, account); },
@@ -241,6 +277,28 @@
                             title: 'Delete account',
                             onclick() { self.deleteAccount(vnode, account.id); },
                           }, '×'),
+                        ]),
+                        s.settingBalanceFor === account.id && m('div.balance-form', [
+                          m('div.balance-form-fields', [
+                            m('input.form-input[type=number]', {
+                              placeholder: 'Current balance (e.g. 1234.56)',
+                              value: s.balanceDraft.amount,
+                              oninput: e => { s.balanceDraft.amount = e.target.value; },
+                            }),
+                            m('input.form-input[type=date]', {
+                              value: s.balanceDraft.date,
+                              oninput: e => { s.balanceDraft.date = e.target.value; },
+                            }),
+                          ]),
+                          m('div.form-actions', [
+                            m('button.btn.btn-ghost', {
+                              onclick() { s.settingBalanceFor = null; },
+                            }, 'Cancel'),
+                            m('button.btn.btn-primary', {
+                              disabled: !s.balanceDraft.amount || !s.balanceDraft.date,
+                              onclick()  { self.saveBalance(vnode, account); },
+                            }, 'Save balance'),
+                          ]),
                         ]),
                       ]
                   );
