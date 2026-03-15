@@ -25,24 +25,6 @@
     return `${n} days`;
   }
 
-  /** "due today" / "due tomorrow" / "due in X days" for a monthly due_day. */
-  function billDueText(dueDay) {
-    if (!dueDay) return null;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    let next = new Date(today.getFullYear(), today.getMonth(), dueDay);
-    if (next < today) next = new Date(today.getFullYear(), today.getMonth() + 1, dueDay);
-    const days = Math.round((next - today) / 86400000);
-    if (days === 0) return 'due today';
-    if (days === 1) return 'due tomorrow';
-    return `due in ${days} days`;
-  }
-
-  function monthLabel() {
-    const now = new Date();
-    return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][now.getMonth()]
-      + ' ' + now.getFullYear();
-  }
-
   const TYPE_LABELS = {
     checking:    'Checking',
     credit_card: 'Credit Card',
@@ -62,20 +44,12 @@
 
     Promise.all([
       window.api.dashboard.summary({ accountId }),
-      window.api.bills.list({ accountId }),
       window.api.accounts.list(),
-    ]).then(([summary, bills, accounts]) => {
+    ]).then(([summary, accounts]) => {
       s.summary  = summary;
-      s.bills    = bills;
       s.accounts = accounts;
       s.loading  = false;
       s.pa.value = summary.paycheckAmountOverride || '';
-
-      // Always detect recurring charges so the list stays available for adding more
-        window.api.bills.detect().then(detected => {
-          s.detected = detected;
-          m.redraw();
-        });
 
       m.redraw();
     }).catch(err => {
@@ -93,9 +67,7 @@
       const s   = vnode.state;
       s.loading  = true;
       s.summary  = null;
-      s.bills    = [];
       s.accounts = [];
-      s.detected = null;
       s.error    = null;
       s.selectedAccountId = null;  // null = all accounts
       // Paycheck setup form state
@@ -127,16 +99,6 @@
       await window.api.settings.set('paycheck_amount', s.pa.value);
       s.pa.saving = false;
       loadData(vnode);
-    },
-
-    async addBill(vnode, detected) {
-      await window.api.bills.save({
-        name:        detected.description,
-        amount:      detected.avg_amount,
-        due_day:     detected.avg_due_day,
-        category_id: detected.category_id,
-      });
-      loadData(vnode, { silent: true });
     },
 
     view(vnode) {
@@ -302,6 +264,7 @@
         m('nav.app-nav', [
           m('span.nav-logo', 'ADHD Finance'),
           m(m.route.Link, { href: '/dashboard', class: 'nav-link active' }, 'Dashboard'),
+          m(m.route.Link, { href: '/insights',  class: 'nav-link' }, 'Insights'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
           m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
@@ -446,101 +409,13 @@
                   ]),
                 ] : [
                   m('div.card-value.muted', 'None tracked'),
-                  s.detected?.length
-                    ? m('div.card-sub', `${s.detected.length} recurring charges below`)
-                    : m('div.card-sub', 'Import transactions to detect bills'),
+                  m('div.card-sub', 'Import transactions to detect bills'),
                 ],
               ]),
 
             ]), // end .stat-cards
 
             payCycleOutlook(),
-
-            // ── Monthly summary tiles ────────────────────────────────────────
-            m('div.monthly-row', [
-              m('div.monthly-tile', [
-                m('div.tile-label', `${monthLabel()} spending`),
-                m('div.tile-value.red',
-                  sum.monthlySpend > 0 ? `\u2212${fmtMoney(sum.monthlySpend)}` : '—'),
-              ]),
-              m('div.monthly-tile', [
-                m('div.tile-label', `${monthLabel()} income`),
-                m('div.tile-value.green',
-                  sum.monthlyIncome > 0 ? `+${fmtMoney(sum.monthlyIncome)}` : '—'),
-              ]),
-            ]),
-
-            // ── Spending breakdown ───────────────────────────────────────────
-            sum.topCategories?.length > 0 && m('div.spending-section', [
-              m('h2.section-title', 'Spending this month'),
-              m('div.spend-bars', (() => {
-                const max = Math.max(...sum.topCategories.map(c => c.total), 1);
-                return sum.topCategories.map(cat =>
-                  m('div.spend-row', [
-                    m('div.spend-name', { class: cat.is_impulse ? 'impulse' : '' },
-                      cat.name || 'Uncategorized'),
-                    m('div.spend-bar-wrap',
-                      m('div.spend-bar-track',
-                        m('div.spend-bar-fill', {
-                          class: cat.is_impulse ? 'impulse' : '',
-                          style: `width:${(cat.total / max * 100).toFixed(1)}%`,
-                        })
-                      )
-                    ),
-                    m('div.spend-amount.mono', fmtMoney(cat.total)),
-                  ])
-                );
-              })()),
-            ]),
-
-            // ── Detected recurring charges ───────────────────────────────────
-            (() => {
-              const trackedNames = new Set(s.bills.map(b => b.name));
-              const untracked = (s.detected || []).filter(d => !trackedNames.has(d.description));
-              return untracked.length > 0 && m('div.detect-section', [
-                m('h2.section-title', 'Recurring charges detected'),
-                m('p.section-hint',
-                  'These appear monthly at a consistent amount. Add them as bills so the dashboard can track upcoming payments.'),
-                m('div.detect-list', untracked.map(d =>
-                  m('div.detect-row', [
-                    m('div.detect-info', [
-                      m('div.detect-name', d.description),
-                      m('div.detect-meta', [
-                        `~${fmtMoney(d.avg_amount)}`,
-                        d.avg_due_day ? ` \u00B7 around day\u00A0${d.avg_due_day}` : '',
-                        ` \u00B7 ${d.occurrences}\u00D7 in 3\u00A0months`,
-                      ]),
-                    ]),
-                    m('button.btn.btn-ghost', {
-                      onclick() { self.addBill(vnode, d); },
-                    }, '+ Track as bill'),
-                  ])
-                )),
-              ]);
-            })(),
-
-            // ── Configured bills list ────────────────────────────────────────
-            s.bills.length > 0 && m('div.bills-section', [
-              m('h2.section-title', 'Bills'),
-              m('div.bills-list', s.bills.map(bill =>
-                m('div.bill-row', [
-                  m('div.bill-info', [
-                    bill.account_color && m('span.account-dot.dot-sm', {
-                      style: `background:${bill.account_color}`,
-                    }),
-                    m('div.bill-name', bill.name),
-                  ]),
-                  m('div.bill-meta', [
-                    bill.amount
-                      ? m('span', fmtMoney(bill.amount))
-                      : m('span.muted', 'variable'),
-                    bill.due_day
-                      ? m('span.muted', ` \u00B7 ${billDueText(bill.due_day)}`)
-                      : null,
-                  ]),
-                ])
-              )),
-            ]),
 
           ], // end !loading && sum
         ]),
