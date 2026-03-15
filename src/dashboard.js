@@ -307,8 +307,9 @@ if (parseFloat(paycheckAmountOverride) > 0) {
       status        = 'setup';
       statusMessage = 'Set up your paycheck schedule';
     } else if (bills.length === 0) {
-      status        = 'setup';
-      statusMessage = 'Add your recurring bills';
+        cushion = balance;
+        status = cushion >= buffer ? 'ok' : cushion >= 0 ? 'tight' : 'danger';
+        statusMessage = 'Add your bills for a more accurate picture';
     } else {
       const estimatedDiscretionarySpend = avgDailyDiscretionary * (daysUntilPaycheck ?? 0);
       cushion = balance - billsBeforeNextTotal;

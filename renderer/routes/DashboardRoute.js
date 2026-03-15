@@ -348,7 +348,7 @@
                 ]),
 
                 // Setup / unknown nudge
-                (sum.status === 'setup' || sum.status === 'unknown') &&
+                (sum.status === 'setup' || sum.status === 'unknown' || sum.statusMessage) &&
                   m('div.status-detail.muted', sum.statusMessage),
               ]),
             ]),
