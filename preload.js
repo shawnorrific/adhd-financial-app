@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     save:       account                 => ipcRenderer.invoke('accounts:save',       account),
     delete:     id                      => ipcRenderer.invoke('accounts:delete',     id),
     setBalance: ({ id, balance, date }) => ipcRenderer.invoke('accounts:setBalance', { id, balance, date }),
+    clearBalance: id                    => ipcRenderer.invoke('accounts:clearBalance', id),
   },
 
   dashboard: {

@@ -297,6 +297,18 @@ ipcMain.handle('transactions:add', (_, { postDate, description, amount, category
      categoryId || null, accountId || null]
   );
 
+
+  // Update manual balance if one exists for this account
+  if (accountId) {
+    const acct = db.get('SELECT manual_balance FROM accounts WHERE id = ?', [accountId]);
+    if (acct?.manual_balance != null) {
+      db.run(
+        'UPDATE accounts SET manual_balance = manual_balance + ? WHERE id = ?',
+        [parseFloat(amount), accountId]
+      );
+    }
+  }
+
   if (shouldAdvance) {
     db.run(
       'UPDATE accounts SET manual_balance = ?, manual_balance_date = ? WHERE id = ?',
@@ -418,5 +430,10 @@ ipcMain.handle('danger:wipe', (_, target) => {
   if (target === 'all') {
     db.run("DELETE FROM _migrations WHERE name != '001_init.sql'");
   }
+  return { ok: true };
+});
+
+ipcMain.handle('accounts:clearBalance', (_, id) => {
+  db.run('UPDATE accounts SET manual_balance = NULL, manual_balance_date = NULL WHERE id = ?', [id]);
   return { ok: true };
 });
