@@ -89,6 +89,7 @@
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' },         'Accounts'),
           m(m.route.Link, { href: '/transactions', class: 'nav-link' },        'Transactions'),
           m(m.route.Link, { href: '/purchase',     class: 'nav-link active' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/settings',     class: 'nav-link' },        'Settings'),
         ]),
 
         m('div.purchase-body', [
