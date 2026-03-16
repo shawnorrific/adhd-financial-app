@@ -248,18 +248,29 @@ let estimatedPaycheck = null;
 if (parseFloat(paycheckAmountOverride) > 0) {
   estimatedPaycheck = parseFloat(paycheckAmountOverride);
 } else {
+  // Fetch deposits for the relevant account(s), limited to last 2 years,
+  // sorted newest-first so clusters anchor to the most recent amounts.
+  const depositWhere = accountId
+    ? 'AND account_id = ? AND post_date >= date(\'now\', \'-2 years\')'
+    : 'AND post_date >= date(\'now\', \'-2 years\')';
+  const depositParams = accountId ? [accountId] : [];
   const deposits = db.all(`
     SELECT amount, post_date
     FROM   transactions
     WHERE  amount > 500
-    ORDER  BY amount ASC
-  `);
+      ${depositWhere}
+    ORDER  BY post_date DESC
+  `, depositParams);
 
+  // Sliding-window clustering: compare each deposit to the LAST member of a
+  // cluster (not the anchor/minimum), so the window adapts to gradual changes
+  // in paycheck amount (raises, withholding adjustments).
   const clusters = [];
   for (const row of deposits) {
     let placed = false;
     for (const cluster of clusters) {
-      if (row.amount / cluster[0].amount <= 1.1) {
+      const ref = cluster[cluster.length - 1].amount;
+      if (row.amount >= ref * 0.9 && row.amount <= ref * 1.1) {
         cluster.push(row);
         placed = true;
         break;
@@ -285,7 +296,9 @@ if (parseFloat(paycheckAmountOverride) > 0) {
   }
 
   if (bestCluster) {
-    estimatedPaycheck = bestCluster.reduce((acc, r) => acc + r.amount, 0) / bestCluster.length;
+    // Average only the 6 most recent members to reflect current pay rate.
+    const recent = bestCluster.slice(0, 6);
+    estimatedPaycheck = recent.reduce((acc, r) => acc + r.amount, 0) / recent.length;
   }
 }
 
