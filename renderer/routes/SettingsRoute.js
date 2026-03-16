@@ -74,6 +74,7 @@
       s.syncResult     = null;
       // Danger Zone
       s.wiping         = null;
+      s.activeSection  = 'financial';
       loadData(vnode);
     },
 
@@ -156,13 +157,25 @@
       m.redraw();
     },
 
+    async saveFinancial(vnode) {
+      await this.saveBuffer(vnode);
+      await this.savePaycheck(vnode);
+    },
+
     view(vnode) {
       const s    = vnode.state;
       const self = this;
 
+      const SECTIONS = [
+        { id: 'financial',    label: 'Financial Preferences' },
+        { id: 'import',       label: 'Import' },
+        { id: 'integrations', label: 'Integrations' },
+        { id: 'danger',       label: 'Danger Zone' },
+      ];
+
       return m('div.settings-page', [
 
-        // ── Nav ──────────────────────────────────────────────────────────────
+        // ── Nav (unchanged) ───────────────────────────────────────────────────
         m('nav.app-nav', [
           m('span.nav-logo', 'ADHD Finance'),
           m(m.route.Link, { href: '/dashboard',    class: 'nav-link' }, 'Dashboard'),
@@ -177,220 +190,231 @@
 
         m('div.settings-body', [
 
-          m('h1.page-title', 'Settings'),
+          // ── Left sidebar ──────────────────────────────────────────────────
+          m('aside.settings-sidebar',
+            SECTIONS.map(sec =>
+              m('button.settings-nav-link', {
+                class:   s.activeSection === sec.id ? 'active' : '',
+                onclick() { s.activeSection = sec.id; },
+              }, sec.label)
+            )
+          ),
 
-          s.loading && m('p.status-msg', '⏳ Loading…'),
-          s.error   && m('p.error-msg', `⚠️ ${s.error}`),
+          // ── Right panel ───────────────────────────────────────────────────
+          m('div.settings-panel', [
 
-          !s.loading && [
+            s.loading && m('p.status-msg', '⏳ Loading…'),
+            s.error   && m('p.error-msg', `⚠️ ${s.error}`),
 
-            // ── 1. Financial Preferences ──────────────────────────────────────
-            m('div.settings-section', [
-              m('h2.section-title', 'Financial Preferences'),
+            !s.loading && [
 
-              m('div.settings-field-group', [
-                m('label.settings-label', 'Balance buffer'),
-                m('p.section-hint', 'Amount kept as a cushion when calculating whether you can afford something.'),
-                m('div.settings-inline-row', [
+              // ── Financial Preferences ─────────────────────────────────────
+              s.activeSection === 'financial' && m('div.settings-section', [
+                m('h2.section-title', 'Financial Preferences'),
+
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Balance buffer'),
+                  m('p.section-hint', 'Amount kept as a cushion when calculating whether you can afford something.'),
                   m('input.form-input[type=number][min=0][step=1]', {
                     value:   s.buffer.value,
                     oninput: e => { s.buffer.value = e.target.value; },
                   }),
-                  m('button.btn.btn-primary', {
-                    disabled: s.buffer.saving,
-                    onclick()  { self.saveBuffer(vnode); },
-                  }, s.buffer.saving ? 'Saving…' : 'Save'),
                 ]),
-              ]),
 
-              m('div.settings-field-group', [
-                m('label.settings-label', 'Paycheck schedule'),
-                m('p.section-hint', 'Used to calculate your upcoming pay dates and project your balance.'),
-                m('label.form-label', 'Frequency'),
-                m('select.cat-select', {
-                  value:    s.pf.frequency,
-                  onchange: e => { s.pf.frequency = e.target.value; },
-                }, [
-                  m('option', { value: 'weekly'      }, 'Weekly'),
-                  m('option', { value: 'biweekly'    }, 'Every 2 weeks'),
-                  m('option', { value: 'semimonthly' }, 'Twice a month (1st & 15th)'),
-                  m('option', { value: 'monthly'     }, 'Monthly'),
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Paycheck schedule'),
+                  m('p.section-hint', 'Used to calculate your upcoming pay dates and project your balance.'),
+                  m('label.form-label', 'Frequency'),
+                  m('select.cat-select', {
+                    value:    s.pf.frequency,
+                    onchange: e => { s.pf.frequency = e.target.value; },
+                  }, [
+                    m('option', { value: 'weekly'      }, 'Weekly'),
+                    m('option', { value: 'biweekly'    }, 'Every 2 weeks'),
+                    m('option', { value: 'semimonthly' }, 'Twice a month (1st & 15th)'),
+                    m('option', { value: 'monthly'     }, 'Monthly'),
+                  ]),
+                  m('label.form-label', 'Last paycheck date'),
+                  m('input.form-input[type=date]', {
+                    value:   s.pf.lastDate,
+                    oninput: e => { s.pf.lastDate = e.target.value; },
+                  }),
+                  m('label.form-label', 'Paycheck amount'),
+                  m('input.form-input[type=number]', {
+                    placeholder: 'Override amount',
+                    value:       s.pf.amount,
+                    oninput:     e => { s.pf.amount = e.target.value; },
+                  }),
                 ]),
-                m('label.form-label', 'Last paycheck date'),
-                m('input.form-input[type=date]', {
-                  value:   s.pf.lastDate,
-                  oninput: e => { s.pf.lastDate = e.target.value; },
-                }),
-                m('label.form-label', 'Paycheck amount'),
-                m('input.form-input[type=number]', {
-                  placeholder: 'Override amount',
-                  value:       s.pf.amount,
-                  oninput:     e => { s.pf.amount = e.target.value; },
-                }),
+
                 m('div.form-actions', [
                   m('button.btn.btn-primary', {
-                    disabled: !s.pf.lastDate || s.pf.saving,
-                    onclick()  { self.savePaycheck(vnode); },
-                  }, s.pf.saving ? 'Saving…' : 'Save'),
+                    disabled: !s.pf.lastDate || s.buffer.saving || s.pf.saving,
+                    onclick()  { self.saveFinancial(vnode); },
+                  }, (s.buffer.saving || s.pf.saving) ? 'Saving…' : 'Save'),
                 ]),
               ]),
-            ]),
 
-            // ── 2. Import ─────────────────────────────────────────────────────
-            m('div.settings-section', [
-              m('h2.section-title', 'Import'),
+              // ── Import ────────────────────────────────────────────────────
+              s.activeSection === 'import' && m('div.settings-section', [
+                m('h2.section-title', 'Import'),
 
-              m('div.settings-field-group', [
-                m('label.settings-label', 'Watch folder'),
-                m('p.section-hint', 'CSV files placed here are imported automatically.'),
-                m('div.watch-folder-path-row', [
-                  m('input.form-input[type=text]', {
-                    value:       s.watchInput,
-                    placeholder: '~/Downloads',
-                    oninput(e)  { s.watchInput = e.target.value; },
-                  }),
-                  m('button.btn', {
-                    async onclick() {
-                      const p = await window.api.dialog.openFolder();
-                      if (p) { s.watchInput = p; m.redraw(); }
-                    },
-                  }, 'Browse'),
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Watch folder'),
+                  m('p.section-hint', 'CSV files placed here are imported automatically.'),
+                  m('div.watch-folder-path-row', [
+                    m('input.form-input[type=text]', {
+                      value:       s.watchInput,
+                      placeholder: '~/Downloads',
+                      oninput(e)  { s.watchInput = e.target.value; },
+                    }),
+                    m('button.btn', {
+                      async onclick() {
+                        const p = await window.api.dialog.openFolder();
+                        if (p) { s.watchInput = p; m.redraw(); }
+                      },
+                    }, 'Browse'),
+                  ]),
+                ]),
+
+                s.batches.length > 0 && m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Import history'),
+                  m('div.import-batch-list',
+                    s.batches.map(batch =>
+                      m('div.import-batch-row', [
+                        m('div.import-batch-meta', [
+                          m('span.import-batch-filename', batch.filename || 'Unknown file'),
+                          m('span.import-batch-date', fmtDateTime(batch.imported_at)),
+                        ]),
+                        m('span.import-batch-count', `${batch.tx_count} tx`),
+                        m('select.cat-select.import-batch-account', {
+                          onchange(e) {
+                            const newId = e.target.value ? parseInt(e.target.value, 10) : null;
+                            batch.account_id = newId;
+                            window.api.imports.setAccount(batch.id, newId);
+                          },
+                        }, [
+                          m('option', { value: '', selected: !batch.account_id }, ''),
+                          ...s.accounts.map(acct =>
+                            m('option', { value: acct.id, selected: acct.id === batch.account_id }, acct.name)
+                          ),
+                        ]),
+                        m('button.btn.icon-btn.delete-btn', {
+                          title: 'Delete all transactions from this import',
+                          async onclick() {
+                            const label = batch.filename || 'this import';
+                            if (!window.confirm(`Delete all ${batch.tx_count} transaction${batch.tx_count !== 1 ? 's' : ''} from \u201c${label}\u201d? This cannot be undone.`)) return;
+                            await window.api.imports.delete(batch.id);
+                            s.batches = s.batches.filter(b => b.id !== batch.id);
+                            m.redraw();
+                          },
+                        }, '\uD83D\uDDD1'),
+                      ])
+                    )
+                  ),
+                ]),
+
+                m('div.form-actions', [
                   m('button.btn.btn-primary', {
                     onclick() { self.saveWatchPath(vnode); },
                   }, s.watchSaved ? 'Saved!' : 'Save'),
                 ]),
               ]),
 
-              s.batches.length > 0 && m('div.settings-field-group', [
-                m('label.settings-label', 'Import history'),
-                m('div.import-batch-list',
-                  s.batches.map(batch =>
-                    m('div.import-batch-row', [
-                      m('div.import-batch-meta', [
-                        m('span.import-batch-filename', batch.filename || 'Unknown file'),
-                        m('span.import-batch-date', fmtDateTime(batch.imported_at)),
+              // ── Integrations ──────────────────────────────────────────────
+              s.activeSection === 'integrations' && m('div.settings-section', [
+                m('h2.section-title', 'Integrations'),
+
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Google Calendar'),
+                  m('p.section-hint', 'Push your bills to Google Calendar so they appear alongside meetings and appointments.'),
+
+                  m('div.gcal-header', [
+                    s.gcal.connected && [
+                      m('span.gcal-connected-badge', `✓ ${s.gcal.email}`),
+                      m('div.gcal-header-actions', [
+                        s.syncResult && m('span.sync-result', s.syncResult),
+                        m('button.btn.btn-ghost', {
+                          onclick() { self.syncAll(vnode); },
+                        }, 'Sync all'),
+                        m('button.btn.btn-ghost', {
+                          onclick() { self.disconnectGcal(vnode); },
+                        }, 'Disconnect'),
                       ]),
-                      m('span.import-batch-count', `${batch.tx_count} tx`),
-                      m('select.cat-select.import-batch-account', {
-                        onchange(e) {
-                          const newId = e.target.value ? parseInt(e.target.value, 10) : null;
-                          batch.account_id = newId;
-                          window.api.imports.setAccount(batch.id, newId);
-                        },
-                      }, [
-                        m('option', { value: '', selected: !batch.account_id }, ''),
-                        ...s.accounts.map(acct =>
-                          m('option', { value: acct.id, selected: acct.id === batch.account_id }, acct.name)
-                        ),
-                      ]),
-                      m('button.btn.icon-btn.delete-btn', {
-                        title: 'Delete all transactions from this import',
-                        async onclick() {
-                          const label = batch.filename || 'this import';
-                          if (!window.confirm(`Delete all ${batch.tx_count} transaction${batch.tx_count !== 1 ? 's' : ''} from \u201c${label}\u201d? This cannot be undone.`)) return;
-                          await window.api.imports.delete(batch.id);
-                          s.batches = s.batches.filter(b => b.id !== batch.id);
-                          m.redraw();
-                        },
-                      }, '\uD83D\uDDD1'),
+                    ],
+                  ]),
+
+                  !s.gcal.connected && [
+                    s.showGcalSetup
+                      ? m('div.gcal-setup', [
+                          s.gcal.hasEnvCredentials
+                            ? m('p.section-hint', 'Credentials loaded from .env — click Connect to authorize.')
+                            : [
+                                m('p.section-hint', [
+                                  '1. Open ',
+                                  m('a.ext-link', {
+                                    href: '#',
+                                    onclick(e) {
+                                      e.preventDefault();
+                                      window.api.shell.openExternal('https://console.cloud.google.com/apis/credentials');
+                                    },
+                                  }, 'Google Cloud Console'),
+                                  ' \u2192 select or create a project',
+                                ]),
+                                m('p.section-hint', '2. Enable the Google Calendar API \u2192 Create Credentials \u2192 OAuth client ID \u2192 Desktop app'),
+                                m('p.section-hint', '3. Paste your credentials below and click Connect:'),
+                                m('input.form-input', {
+                                  placeholder: 'Client ID',
+                                  value:       s.gcalForm.clientId,
+                                  oninput:     e => { s.gcalForm.clientId = e.target.value; },
+                                }),
+                                m('input.form-input', {
+                                  placeholder: 'Client Secret',
+                                  type:        'password',
+                                  value:       s.gcalForm.clientSecret,
+                                  oninput:     e => { s.gcalForm.clientSecret = e.target.value; },
+                                }),
+                              ],
+                          s.gcalError && m('p.error-msg', s.gcalError),
+                          m('div.form-actions', [
+                            m('button.btn.btn-ghost', {
+                              onclick() { s.showGcalSetup = false; s.gcalError = null; },
+                            }, 'Cancel'),
+                            m('button.btn.btn-primary', {
+                              disabled: (!s.gcal.hasEnvCredentials && (!s.gcalForm.clientId || !s.gcalForm.clientSecret)) || s.gcalConnecting,
+                              onclick()  { self.connectGcal(vnode); },
+                            }, s.gcalConnecting ? 'Waiting for browser…' : 'Connect'),
+                          ]),
+                        ])
+                      : m('div.gcal-prompt', [
+                          m('button.btn.btn-primary', {
+                            onclick() { s.showGcalSetup = true; },
+                          }, 'Connect Google Calendar'),
+                        ]),
+                  ],
+                ]),
+              ]),
+
+              // ── Danger Zone ───────────────────────────────────────────────
+              s.activeSection === 'danger' && m('div.settings-section.settings-section--danger', [
+                m('h2.section-title', 'Danger Zone'),
+                m('p.section-hint', 'Deletions are immediate and permanent.'),
+                m('div.dz-btn-list',
+                  WIPE_TARGETS.map(t =>
+                    m('button.dz-wipe-btn', {
+                      class:    t.id === 'all' ? 'dz-wipe-btn--all' : '',
+                      disabled: s.wiping !== null,
+                      onclick() { self.wipe(vnode, t.id); },
+                    }, [
+                      m('span.dz-wipe-label', `Wipe ${t.label}`),
+                      m('span.dz-wipe-detail', t.detail),
                     ])
                   )
                 ),
               ]),
-            ]),
 
-            // ── 3. Integrations ───────────────────────────────────────────────
-            m('div.settings-section', [
-              m('h2.section-title', 'Integrations'),
-
-              m('div.settings-field-group', [
-                m('div.gcal-header', [
-                  m('h3.settings-label', 'Google Calendar'),
-                  s.gcal.connected && [
-                    m('span.gcal-connected-badge', `✓ ${s.gcal.email}`),
-                    m('div.gcal-header-actions', [
-                      s.syncResult && m('span.sync-result', s.syncResult),
-                      m('button.btn.btn-ghost', {
-                        onclick() { self.syncAll(vnode); },
-                      }, 'Sync all'),
-                      m('button.btn.btn-ghost', {
-                        onclick() { self.disconnectGcal(vnode); },
-                      }, 'Disconnect'),
-                    ]),
-                  ],
-                ]),
-
-                !s.gcal.connected && [
-                  s.showGcalSetup
-                    ? m('div.gcal-setup', [
-                        s.gcal.hasEnvCredentials
-                          ? m('p.section-hint', 'Credentials loaded from .env — click Connect to authorize.')
-                          : [
-                              m('p.section-hint', [
-                                '1. Open ',
-                                m('a.ext-link', {
-                                  href: '#',
-                                  onclick(e) {
-                                    e.preventDefault();
-                                    window.api.shell.openExternal('https://console.cloud.google.com/apis/credentials');
-                                  },
-                                }, 'Google Cloud Console'),
-                                ' \u2192 select or create a project',
-                              ]),
-                              m('p.section-hint', '2. Enable the Google Calendar API \u2192 Create Credentials \u2192 OAuth client ID \u2192 Desktop app'),
-                              m('p.section-hint', '3. Paste your credentials below and click Connect:'),
-                              m('input.form-input', {
-                                placeholder: 'Client ID',
-                                value:       s.gcalForm.clientId,
-                                oninput:     e => { s.gcalForm.clientId = e.target.value; },
-                              }),
-                              m('input.form-input', {
-                                placeholder: 'Client Secret',
-                                type:        'password',
-                                value:       s.gcalForm.clientSecret,
-                                oninput:     e => { s.gcalForm.clientSecret = e.target.value; },
-                              }),
-                            ],
-                        s.gcalError && m('p.error-msg', s.gcalError),
-                        m('div.form-actions', [
-                          m('button.btn.btn-ghost', {
-                            onclick() { s.showGcalSetup = false; s.gcalError = null; },
-                          }, 'Cancel'),
-                          m('button.btn.btn-primary', {
-                            disabled: (!s.gcal.hasEnvCredentials && (!s.gcalForm.clientId || !s.gcalForm.clientSecret)) || s.gcalConnecting,
-                            onclick()  { self.connectGcal(vnode); },
-                          }, s.gcalConnecting ? 'Waiting for browser…' : 'Connect'),
-                        ]),
-                      ])
-                    : m('div.gcal-prompt', [
-                        m('p', 'Push your bills to Google Calendar so they appear alongside meetings and appointments.'),
-                        m('button.btn.btn-primary', {
-                          onclick() { s.showGcalSetup = true; },
-                        }, 'Connect Google Calendar'),
-                      ]),
-                ],
-              ]),
-            ]),
-
-            // ── 4. Danger Zone ────────────────────────────────────────────────
-            m('div.settings-section.settings-section--danger', [
-              m('h2.section-title', 'Danger Zone'),
-              m('p.section-hint', 'Deletions are immediate and permanent.'),
-              m('div.dz-btn-list',
-                WIPE_TARGETS.map(t =>
-                  m('button.dz-wipe-btn', {
-                    class:    t.id === 'all' ? 'dz-wipe-btn--all' : '',
-                    disabled: s.wiping !== null,
-                    onclick() { self.wipe(vnode, t.id); },
-                  }, [
-                    m('span.dz-wipe-label', `Wipe ${t.label}`),
-                    m('span.dz-wipe-detail', t.detail),
-                  ])
-                )
-              ),
-            ]),
-
-          ], // end !loading
+            ], // end !loading
+          ]),
         ]),
       ]);
     },
