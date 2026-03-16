@@ -147,4 +147,5 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('google_access_token', ''),
   ('google_token_expiry', '0'),
   ('google_user_email',   ''),
-  ('paycheck_amount',     '');
+  ('paycheck_amount',     ''),
+  ('food_delivery_milestone_threshold', '800');

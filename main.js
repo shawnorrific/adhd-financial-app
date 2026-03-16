@@ -410,6 +410,220 @@ ipcMain.handle('imports:delete', (_, batchId) => {
   return { ok: true };
 });
 
+// ── IPC: insights ────────────────────────────────────────────────────────────
+
+ipcMain.handle('insights:category-comparison', (_, { accountId } = {}) => {
+  const acctFilter = accountId ? 'AND t.account_id = ?' : '';
+  const params     = accountId ? [accountId] : [];
+  return db.all(`
+    SELECT
+      COALESCE(c.name, 'Uncategorized')  AS name,
+      COALESCE(c.is_impulse, 0)          AS is_impulse,
+      ROUND(COALESCE(SUM(CASE
+        WHEN t.post_date >= strftime('%Y-%m-01', 'now')
+        THEN ABS(t.amount) ELSE 0 END), 0), 2) AS current_month,
+      ROUND(COALESCE(SUM(CASE
+        WHEN t.post_date >= strftime('%Y-%m-01', date('now', '-1 month'))
+         AND t.post_date <  strftime('%Y-%m-01', 'now')
+        THEN ABS(t.amount) ELSE 0 END), 0), 2) AS last_month
+    FROM   transactions t
+    LEFT JOIN categories c ON c.id = t.category_id
+    WHERE  t.amount < 0
+      AND  t.post_date >= strftime('%Y-%m-01', date('now', '-1 month'))
+      AND  (c.name IS NULL OR c.name NOT IN ('Income', 'Transfer', 'ATM / Cash'))
+      ${acctFilter}
+    GROUP  BY t.category_id
+    HAVING current_month > 0 OR last_month > 0
+    ORDER  BY current_month DESC
+  `, params);
+});
+
+ipcMain.handle('insights:category-trends', (_, { accountId } = {}) => {
+  const acctFilter = accountId ? 'AND t.account_id = ?' : '';
+  const params     = accountId ? [accountId] : [];
+  return db.all(`
+    SELECT
+      COALESCE(c.name, 'Uncategorized') AS name,
+      COALESCE(c.is_impulse, 0)         AS is_impulse,
+      ROUND(COALESCE(SUM(CASE
+        WHEN t.post_date >= strftime('%Y-%m-01', 'now')
+        THEN ABS(t.amount) ELSE 0 END), 0), 2) AS m0,
+      ROUND(COALESCE(SUM(CASE
+        WHEN t.post_date >= strftime('%Y-%m-01', date('now', '-1 month'))
+         AND t.post_date <  strftime('%Y-%m-01', 'now')
+        THEN ABS(t.amount) ELSE 0 END), 0), 2) AS m1,
+      ROUND(COALESCE(SUM(CASE
+        WHEN t.post_date >= strftime('%Y-%m-01', date('now', '-2 months'))
+         AND t.post_date <  strftime('%Y-%m-01', date('now', '-1 month'))
+        THEN ABS(t.amount) ELSE 0 END), 0), 2) AS m2
+    FROM   transactions t
+    LEFT JOIN categories c ON c.id = t.category_id
+    WHERE  t.amount < 0
+      AND  t.post_date >= strftime('%Y-%m-01', date('now', '-2 months'))
+      AND  (c.name IS NULL OR c.name NOT IN ('Income', 'Transfer', 'ATM / Cash'))
+      ${acctFilter}
+    GROUP  BY t.category_id
+    HAVING m0 > 0 OR m1 > 0 OR m2 > 0
+    ORDER  BY (m0 + m1 + m2) DESC
+    LIMIT  8
+  `, params);
+});
+
+ipcMain.handle('insights:spiral-pattern', (_, { accountId } = {}) => {
+  const acctFilter = accountId ? 'AND t.account_id = ?' : '';
+  const acctParams = accountId ? [accountId] : [];
+
+  // Distinct dates where balance was below $100, excluding dates within 3 days of a paycheck
+  const lowDates = db.all(`
+    SELECT DISTINCT t.post_date
+    FROM   transactions t
+    WHERE  t.balance IS NOT NULL
+      AND  t.balance < 100
+      ${acctFilter}
+      AND  NOT EXISTS (
+        SELECT 1 FROM transactions t2
+        LEFT JOIN categories c2 ON c2.id = t2.category_id
+        WHERE  c2.name = 'Income'
+          AND  t2.post_date >= date(t.post_date, '-3 days')
+          AND  t2.post_date <= t.post_date
+      )
+    ORDER  BY t.post_date
+  `, acctParams);
+
+  if (!lowDates.length) {
+    return { count: 0, countWithImpulse: 0, pctWithImpulse: 0, avgAmount: 0, total: 0 };
+  }
+
+  const impulseAcctFilter = accountId ? 'AND t.account_id = ?' : '';
+  let countWithImpulse    = 0;
+  let totalImpulseAmount  = 0;
+
+  for (const { post_date } of lowDates) {
+    const impulseParams = accountId
+      ? [post_date, post_date, accountId]
+      : [post_date, post_date];
+    const row = db.get(`
+      SELECT COALESCE(SUM(ABS(t.amount)), 0) AS total
+      FROM   transactions t
+      LEFT JOIN categories c ON c.id = t.category_id
+      WHERE  c.is_impulse = 1
+        AND  t.amount < 0
+        AND  t.post_date >  ?
+        AND  t.post_date <= date(?, '+3 days')
+        ${impulseAcctFilter}
+    `, impulseParams);
+    if (row && row.total > 0) {
+      countWithImpulse++;
+      totalImpulseAmount += row.total;
+    }
+  }
+
+  return {
+    count:            lowDates.length,
+    countWithImpulse,
+    pctWithImpulse:   Math.round(countWithImpulse / lowDates.length * 100),
+    avgAmount:        countWithImpulse > 0 ? Math.round(totalImpulseAmount / countWithImpulse) : 0,
+    total:            Math.round(totalImpulseAmount * 100) / 100,
+  };
+});
+
+ipcMain.handle('insights:milestones', () => {
+  const fdThreshold = parseFloat(
+    db.get("SELECT value FROM settings WHERE key = 'food_delivery_milestone_threshold'")?.value || '800'
+  );
+
+  const MILESTONES = [
+    {
+      id:          'first-month-food-delivery',
+      label:       'Food Delivery Win',
+      description: `First month under $${fdThreshold.toFixed(0)} on Food Delivery`,
+    },
+    {
+      id:          'first-30-days-no-overdraft',
+      label:       'Clean Slate',
+      description: 'First 30 days without an overdraft fee',
+    },
+    {
+      id:          'bills-added',
+      label:       'Getting Organized',
+      description: 'Added your first bill to track',
+    },
+  ];
+
+  const raw    = db.get("SELECT value FROM settings WHERE key = 'earned_milestones'")?.value;
+  const earned = raw ? JSON.parse(raw) : {};
+
+  if (!earned['first-month-food-delivery']) {
+    const row = db.get(`
+      SELECT strftime('%Y-%m', t.post_date) AS month
+      FROM   transactions t
+      LEFT JOIN categories c ON c.id = t.category_id
+      WHERE  c.name = 'Food Delivery' AND t.amount < 0
+      GROUP  BY month
+      HAVING SUM(ABS(t.amount)) < ?
+      ORDER  BY month
+      LIMIT  1
+    `, [fdThreshold]);
+    if (row) earned['first-month-food-delivery'] = row.month;
+  }
+
+  if (!earned['first-30-days-no-overdraft']) {
+    const firstTx = db.get('SELECT MIN(post_date) AS d FROM transactions');
+    if (firstTx?.d) {
+      const overdrafts = db.all(`
+        SELECT post_date FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE  c.name = 'Fees'
+          AND  (t.description LIKE '%Overdraft%' OR t.description LIKE '%NSF%')
+        ORDER  BY post_date
+      `);
+
+      if (overdrafts.length === 0) {
+        const daysSince = Math.round((new Date() - new Date(firstTx.d)) / 86400000);
+        if (daysSince >= 30) earned['first-30-days-no-overdraft'] = firstTx.d;
+      } else {
+        const gapBefore = Math.round(
+          (new Date(overdrafts[0].post_date) - new Date(firstTx.d)) / 86400000
+        );
+        if (gapBefore >= 30) {
+          earned['first-30-days-no-overdraft'] = firstTx.d;
+        } else {
+          let found = false;
+          for (let i = 0; i < overdrafts.length - 1; i++) {
+            const gap = Math.round(
+              (new Date(overdrafts[i + 1].post_date) - new Date(overdrafts[i].post_date)) / 86400000
+            );
+            if (gap >= 30) {
+              earned['first-30-days-no-overdraft'] = overdrafts[i].post_date;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            const last      = overdrafts[overdrafts.length - 1].post_date;
+            const daysSince = Math.round((new Date() - new Date(last)) / 86400000);
+            if (daysSince >= 30) earned['first-30-days-no-overdraft'] = last;
+          }
+        }
+      }
+    }
+  }
+
+  if (!earned['bills-added']) {
+    const count = db.get('SELECT COUNT(*) AS n FROM bills WHERE is_active = 1')?.n || 0;
+    if (count > 0) earned['bills-added'] = new Date().toISOString().split('T')[0];
+  }
+
+  db.run(
+    "INSERT INTO settings (key, value) VALUES ('earned_milestones', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    [JSON.stringify(earned)]
+  );
+
+  return MILESTONES
+    .filter(ms => earned[ms.id])
+    .map(ms => ({ ...ms, earnedAt: earned[ms.id] }));
+});
+
 // ── IPC: danger zone (testing utility) ───────────────────────────────────────
 ipcMain.handle('danger:wipe', (_, target) => {
   if (target === 'transactions' || target === 'all') {
