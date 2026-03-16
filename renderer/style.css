@@ -1327,6 +1327,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 
 .import-batch-account { width: 160px; }
 
+/* ── Settings page ─────────────────────────────────────────────────────────── */
+.settings-page { display: flex; flex-direction: column; min-height: 100vh; }
+
+.settings-body {
+  flex: 1;
+  padding: 28px 32px 48px;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 /* ── Danger zone ───────────────────────────────────────────────────────────── */
 #danger-zone { position: fixed; bottom: 18px; right: 18px; z-index: 9999; }
 
