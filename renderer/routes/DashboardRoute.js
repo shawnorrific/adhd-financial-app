@@ -168,6 +168,10 @@
                   m('span.outlook-row-label', 'Bills before paycheck'),
                   m('span.outlook-row-value.red', '\u2212' + fmtMoney(sum.billsBeforeNextTotal)),
                 ]),
+                sum.buffer > 0 && m('div.outlook-row', [
+                  m('span.outlook-row-label', 'Buffer'),
+                  m('span.outlook-row-value.muted', '\u2212' + fmtMoney(sum.buffer)),
+                ]),
                 m('div.outlook-row.outlook-row--divider.outlook-row--total', [
                   m('span.outlook-row-label', 'Free to spend'),
                   m('span.outlook-row-value', {

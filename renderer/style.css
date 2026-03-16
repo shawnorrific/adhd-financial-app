@@ -1514,8 +1514,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 
 .outlook-row-label { color: var(--muted); flex: 1; }
 .outlook-row-value { font-family: var(--mono); white-space: nowrap; }
-.outlook-row-value.green { color: var(--green); }
-.outlook-row-value.red   { color: var(--red); }
+.outlook-row-value.green  { color: var(--green); }
+.outlook-row-value.red    { color: var(--red); }
+.outlook-row-value.muted  { color: var(--muted); }
 
 .outlook-heavy-tag {
   display: inline-block;
