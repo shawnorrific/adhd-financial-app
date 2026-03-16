@@ -168,10 +168,10 @@
           m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
           m(m.route.Link, { href: '/insights',  class: 'nav-link' }, 'Insights'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
-          m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link active' }, 'Accounts'),
           m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
           m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/settings',     class: 'nav-link' }, 'Settings'),
         ]),
 
         m('div.accounts-body', [
@@ -261,7 +261,6 @@
                               s.balanceError = null;
                             },
                           }, 'Set balance'),
-                            // ↓ ADD THIS
                           account.manual_balance != null && m('button.btn.btn-ghost.btn-sm', {
                             title: 'Clear manual balance',
                             async onclick() {
@@ -269,7 +268,6 @@
                               loadData(vnode);
                             },
                           }, 'Clear balance'),
-                          // ↑ END ADD
                           m('button.btn.btn-ghost.icon-btn', {
                             title: 'Edit account',
                             onclick() { self.startEdit(vnode, account); },

@@ -1,0 +1,637 @@
+// SettingsRoute.js — app-wide settings
+// Loaded as a plain script. Defines window.Routes.Settings.
+(function () {
+  'use strict';
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const [y, mo, d] = iso.split('-');
+    return `${mo}/${d}/${y.slice(2)}`;
+  }
+
+  function fmtAmount(n) {
+    const abs = Math.abs(n).toFixed(2);
+    return n < 0 ? `\u2212$${abs}` : `+$${abs}`;
+  }
+
+  function fmtDateTime(raw) {
+    if (!raw) return '';
+    const d = new Date(raw.replace(' ', 'T') + 'Z');
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const WIPE_TARGETS = [
+    { id: 'transactions', label: 'Transactions', detail: 'Deletes all transactions and import history.' },
+    { id: 'bills',        label: 'Bills',        detail: 'Deletes all bills.' },
+    { id: 'accounts',     label: 'Accounts',     detail: 'Deletes all accounts.' },
+    { id: 'all',          label: 'Everything',   detail: 'Wipes transactions, import history, bills, and accounts.' },
+  ];
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  function loadData(vnode) {
+    const s = vnode.state;
+    Promise.all([
+      window.api.settings.get('balance_buffer'),
+      window.api.settings.get('paycheck_frequency'),
+      window.api.settings.get('paycheck_last_date'),
+      window.api.settings.get('paycheck_amount'),
+      window.api.watcher.getPath(),
+      window.api.imports.list(),
+      window.api.gcal.status(),
+      window.api.accounts.list(),
+      window.api.categories.list(),
+    ]).then(([buffer, pfFreq, pfDate, pfAmount, watchPath, batches, gcal, accounts, categories]) => {
+      s.buffer.value = buffer   || '200';
+      s.pf.frequency = pfFreq   || 'biweekly';
+      s.pf.lastDate  = pfDate   || '';
+      s.pf.amount    = pfAmount || '';
+      s.watchInput   = watchPath || '';
+      s.batches      = batches;
+      s.gcal         = gcal;
+      s.accounts     = accounts;
+      s.categories   = categories;
+      s.loading      = false;
+      m.redraw();
+    }).catch(err => {
+      s.error   = err.message || String(err);
+      s.loading = false;
+      m.redraw();
+    });
+  }
+
+  // ── Component ─────────────────────────────────────────────────────────────
+
+  const SettingsRoute = {
+
+    oninit(vnode) {
+      const s          = vnode.state;
+      s.loading        = true;
+      s.error          = null;
+      // Financial Preferences
+      s.buffer         = { value: '', saving: false };
+      s.pf             = { frequency: 'biweekly', lastDate: '', amount: '', saving: false };
+      s.financialSaved = false;
+      // Import — file picking
+      s.stage           = 'idle';   // idle | loading | previewing | importing | done | error
+      s.preview         = [];
+      s.categories      = [];
+      s.selectedAccount = null;
+      s.stats           = null;
+      s.importError     = null;
+      s.pendingFilename = null;
+      // Import — watch folder
+      s.watchInput     = '';
+      s.watchSaved     = false;
+      s.watchToast     = null;
+      // Import — history
+      s.batches        = [];
+      s.accounts       = [];
+      // Integrations — Google Calendar
+      s.gcal           = { connected: false, email: null, hasEnvCredentials: false };
+      s.showGcalSetup  = false;
+      s.gcalForm       = { clientId: '', clientSecret: '' };
+      s.gcalConnecting = false;
+      s.gcalError      = null;
+      s.syncResult     = null;
+      // Danger Zone
+      s.wiping         = null;
+      s.activeSection  = 'financial';
+
+      loadData(vnode);
+
+      // Subscribe to background-import events; store cleanup fns for onremove
+      s._offImport = window.api.watcher.onImport(async data => {
+        s.watchToast = { type: 'imported', ...data };
+        s.batches = await window.api.imports.list();
+        m.redraw();
+        setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
+      });
+      s._offUnrecognized = window.api.watcher.onUnrecognized(data => {
+        s.watchToast = { type: 'unrecognized', ...data };
+        m.redraw();
+        setTimeout(() => { s.watchToast = null; m.redraw(); }, 7000);
+      });
+    },
+
+    onremove(vnode) {
+      const s = vnode.state;
+      if (s._offImport)       s._offImport();
+      if (s._offUnrecognized) s._offUnrecognized();
+    },
+
+    async saveBuffer(vnode) {
+      const s = vnode.state;
+      s.buffer.saving = true;
+      m.redraw();
+      await window.api.settings.set('balance_buffer', s.buffer.value);
+      s.buffer.saving = false;
+      m.redraw();
+    },
+
+    async savePaycheck(vnode) {
+      const s = vnode.state;
+      if (!s.pf.lastDate) return;
+      s.pf.saving = true;
+      m.redraw();
+      await Promise.all([
+        window.api.settings.set('paycheck_frequency', s.pf.frequency),
+        window.api.settings.set('paycheck_last_date',  s.pf.lastDate),
+        window.api.settings.set('paycheck_amount',     s.pf.amount),
+      ]);
+      s.pf.saving = false;
+      m.redraw();
+    },
+
+    async saveFinancial(vnode) {
+      await this.saveBuffer(vnode);
+      await this.savePaycheck(vnode);
+      const s = vnode.state;
+      s.financialSaved = true;
+      m.redraw();
+      setTimeout(() => { s.financialSaved = false; m.redraw(); }, 2000);
+    },
+
+    async saveWatchPath(vnode) {
+      const s = vnode.state;
+      await window.api.watcher.setPath(s.watchInput);
+      s.watchSaved = true;
+      m.redraw();
+      setTimeout(() => { s.watchSaved = false; m.redraw(); }, 2000);
+    },
+
+    async openFile(vnode) {
+      const s      = vnode.state;
+      const result = await window.api.dialog.openFile();
+      if (!result) return;
+      const { filePath, content } = result;
+
+      s.stage           = 'loading';
+      s.importError     = null;
+      s.pendingFilename = filePath.split(/[\\/]/).pop();
+      m.redraw();
+
+      try {
+        const rows = await window.api.csv.preview(content, filePath);
+        if (!rows.length) throw new Error('No transactions found — check the file format.');
+        s.preview = rows;
+        s.stage   = 'previewing';
+      } catch (err) {
+        s.importError = err.message || String(err);
+        s.stage       = 'error';
+      }
+      m.redraw();
+    },
+
+    async doImport(vnode) {
+      const s = vnode.state;
+      s.stage = 'importing';
+      m.redraw();
+      try {
+        const accountId = s.selectedAccount ? s.selectedAccount.id : null;
+        s.stats   = await window.api.csv.import(s.preview, accountId, s.pendingFilename);
+        s.batches = await window.api.imports.list();
+        s.stage   = 'done';
+      } catch (err) {
+        s.importError = err.message || String(err);
+        s.stage       = 'error';
+      }
+      m.redraw();
+    },
+
+    async connectGcal(vnode) {
+      const s            = vnode.state;
+      const clientId     = s.gcal.hasEnvCredentials ? '' : s.gcalForm.clientId;
+      const clientSecret = s.gcal.hasEnvCredentials ? '' : s.gcalForm.clientSecret;
+      if (!s.gcal.hasEnvCredentials && (!clientId || !clientSecret)) return;
+      s.gcalConnecting = true;
+      s.gcalError      = null;
+      m.redraw();
+      const result = await window.api.gcal.authorize({ clientId, clientSecret });
+      s.gcalConnecting = false;
+      if (result.ok) {
+        s.gcal          = { connected: true, email: result.email };
+        s.showGcalSetup = false;
+      } else {
+        s.gcalError = result.error;
+      }
+      m.redraw();
+    },
+
+    async disconnectGcal(vnode) {
+      await window.api.gcal.disconnect();
+      vnode.state.gcal = { connected: false, email: null };
+      m.redraw();
+    },
+
+    async syncAll(vnode) {
+      const s = vnode.state;
+      s.syncResult = null;
+      m.redraw();
+      const result = await window.api.gcal.syncAll();
+      s.syncResult = result.failed === 0
+        ? `Synced ${result.synced} bill${result.synced !== 1 ? 's' : ''} to Google Calendar`
+        : `${result.synced} synced, ${result.failed} failed: ${result.errors.join('; ')}`;
+      m.redraw();
+      setTimeout(() => { vnode.state.syncResult = null; m.redraw(); }, 5000);
+    },
+
+    async wipe(vnode, target) {
+      const s = vnode.state;
+      const t = WIPE_TARGETS.find(x => x.id === target);
+      if (!window.confirm(`Delete ${t.label.toLowerCase()}?\n\n${t.detail}\n\nThis cannot be undone.`)) return;
+      s.wiping = target;
+      m.redraw();
+      await window.api.danger.wipe(target);
+      s.wiping = null;
+      m.redraw();
+    },
+
+    view(vnode) {
+      const s    = vnode.state;
+      const self = this;
+
+      const SECTIONS = [
+        { id: 'financial',    label: 'Financial Preferences' },
+        { id: 'import',       label: 'Import' },
+        { id: 'integrations', label: 'Integrations' },
+        { id: 'danger',       label: 'Danger Zone' },
+      ];
+
+      // ── Account selector (used inside Import section) ──────────────────────
+      function accountSelector() {
+        if (!s.accounts.length) return null;
+        return m('div.import-account-row', [
+          m('span.import-account-label', 'Import into:'),
+          m('div.account-chip-group', [
+            m('button.account-chip', {
+              class: !s.selectedAccount ? 'active' : '',
+              onclick() { s.selectedAccount = null; m.redraw(); },
+            }, 'No account'),
+            ...s.accounts.map(acct =>
+              m('button.account-chip', {
+                class: s.selectedAccount?.id === acct.id ? 'active' : '',
+                style: s.selectedAccount?.id === acct.id
+                  ? `background:${acct.color}20; border-color:${acct.color}; color:${acct.color}`
+                  : `border-color:${acct.color}40`,
+                onclick() { s.selectedAccount = acct; m.redraw(); },
+              }, [
+                m('span.pill-dot', { style: `background:${acct.color}` }),
+                acct.name,
+              ])
+            ),
+          ]),
+        ]);
+      }
+
+      return m('div.settings-page', [
+
+        // ── Nav ───────────────────────────────────────────────────────────────
+        m('nav.app-nav', [
+          m('span.nav-logo', 'ADHD Finance'),
+          m(m.route.Link, { href: '/dashboard',    class: 'nav-link' }, 'Dashboard'),
+          m(m.route.Link, { href: '/insights',     class: 'nav-link' }, 'Insights'),
+          m(m.route.Link, { href: '/bills',        class: 'nav-link' }, 'Bills'),
+          m(m.route.Link, { href: '/accounts',     class: 'nav-link' }, 'Accounts'),
+          m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
+          m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/settings',     class: 'nav-link active' }, 'Settings'),
+        ]),
+
+        m('div.settings-body', [
+
+          // ── Left sidebar ──────────────────────────────────────────────────
+          m('aside.settings-sidebar',
+            SECTIONS.map(sec =>
+              m('button.settings-nav-link', {
+                class:   s.activeSection === sec.id ? 'active' : '',
+                onclick() { s.activeSection = sec.id; },
+              }, sec.label)
+            )
+          ),
+
+          // ── Right panel ───────────────────────────────────────────────────
+          m('div.settings-panel', [
+
+            s.loading && m('p.status-msg', '⏳ Loading…'),
+            s.error   && m('p.error-msg', `⚠️ ${s.error}`),
+
+            !s.loading && [
+
+              // ── Financial Preferences ─────────────────────────────────────
+              s.activeSection === 'financial' && m('div.settings-section', [
+                m('h2.section-title', 'Financial Preferences'),
+
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Balance buffer'),
+                  m('p.section-hint', 'Amount kept as a cushion when calculating whether you can afford something.'),
+                  m('input.form-input[type=number][min=0][step=1]', {
+                    value:   s.buffer.value,
+                    oninput: e => { s.buffer.value = e.target.value; },
+                  }),
+                ]),
+
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Paycheck schedule'),
+                  m('p.section-hint', 'Used to calculate your upcoming pay dates and project your balance.'),
+                  m('label.form-label', 'Frequency'),
+                  m('select.cat-select', {
+                    value:    s.pf.frequency,
+                    onchange: e => { s.pf.frequency = e.target.value; },
+                  }, [
+                    m('option', { value: 'weekly'      }, 'Weekly'),
+                    m('option', { value: 'biweekly'    }, 'Every 2 weeks'),
+                    m('option', { value: 'semimonthly' }, 'Twice a month (1st & 15th)'),
+                    m('option', { value: 'monthly'     }, 'Monthly'),
+                  ]),
+                  m('label.form-label', 'Last paycheck date'),
+                  m('input.form-input[type=date]', {
+                    value:   s.pf.lastDate,
+                    oninput: e => { s.pf.lastDate = e.target.value; },
+                  }),
+                  m('label.form-label', 'Paycheck amount'),
+                  m('input.form-input[type=number]', {
+                    placeholder: 'Override amount',
+                    value:       s.pf.amount,
+                    oninput:     e => { s.pf.amount = e.target.value; },
+                  }),
+                ]),
+
+                m('div.form-actions', [
+                  m('button.btn.btn-primary', {
+                    disabled: s.buffer.saving || s.pf.saving,
+                    onclick()  { self.saveFinancial(vnode); },
+                  }, s.financialSaved ? 'Saved!' : (s.buffer.saving || s.pf.saving) ? 'Saving…' : 'Save'),
+                ]),
+              ]),
+
+              // ── Import ────────────────────────────────────────────────────
+              s.activeSection === 'import' && m('div.settings-section', [
+                m('h2.section-title', 'Import'),
+
+                // Watch folder config
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Watch folder'),
+                  m('p.section-hint', 'CSV files placed here are imported automatically.'),
+                  m('div.watch-folder-path-row', [
+                    m('input.form-input[type=text]', {
+                      value:       s.watchInput,
+                      placeholder: '~/Downloads',
+                      oninput(e)  { s.watchInput = e.target.value; },
+                    }),
+                    m('button.btn', {
+                      async onclick() {
+                        const p = await window.api.dialog.openFolder();
+                        if (p) { s.watchInput = p; m.redraw(); }
+                      },
+                    }, 'Browse'),
+                  ]),
+                  m('div.form-actions', [
+                    m('button.btn.btn-primary', {
+                      onclick() { self.saveWatchPath(vnode); },
+                    }, s.watchSaved ? 'Saved!' : 'Save'),
+                  ]),
+                  s.watchToast && m('div.watch-toast', {
+                    class: s.watchToast.type === 'imported'
+                      ? 'watch-toast--imported'
+                      : 'watch-toast--unrecognized',
+                  }, [
+                    s.watchToast.type === 'imported'
+                      ? `Imported ${s.watchToast.imported} transaction${s.watchToast.imported !== 1 ? 's' : ''}` +
+                        (s.watchToast.skipped ? ` (${s.watchToast.skipped} duplicate${s.watchToast.skipped !== 1 ? 's' : ''} skipped)` : '') +
+                        ` from \u201c${s.watchToast.filename}\u201d.`
+                      : `\u201c${s.watchToast.filename}\u201d was found but doesn\u2019t match the Verity Credit Union format.`,
+                    m('button.watch-toast-dismiss', {
+                      onclick() { s.watchToast = null; m.redraw(); },
+                    }, '\u00d7'),
+                  ]),
+                ]),
+
+                // File import
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Import CSV file'),
+
+                  // Account selector
+                  (s.stage === 'idle' || s.stage === 'previewing') && accountSelector(),
+
+                  // Idle — file picker
+                  s.stage === 'idle' && m('div.drop-zone', [
+                    m('div.drop-icon', '📂'),
+                    m('p.drop-primary', 'Choose a CSV file to import'),
+                    m('button.btn', { onclick() { self.openFile(vnode); } }, 'Choose file'),
+                  ]),
+
+                  // Spinners
+                  s.stage === 'loading'   && m('p.status-msg', '⏳ Parsing CSV…'),
+                  s.stage === 'importing' && m('p.status-msg', '⏳ Importing…'),
+
+                  // Preview table
+                  s.stage === 'previewing' && [
+                    m('div.preview-header', [
+                      m('span.tx-count', `${s.preview.length} transactions found`),
+                      m('div.preview-actions', [
+                        m('button.btn.btn-ghost', {
+                          onclick() { s.stage = 'idle'; s.preview = []; m.redraw(); },
+                        }, 'Cancel'),
+                        m('button.btn.btn-primary', {
+                          onclick() { self.doImport(vnode); },
+                        }, `Import ${s.preview.length} transactions` +
+                           (s.selectedAccount ? ` → ${s.selectedAccount.name}` : '')
+                        ),
+                      ]),
+                    ]),
+                    m('div.table-scroll',
+                      m('table.tx-table.tx-table--no-sticky', [
+                        m('thead', m('tr', [
+                          m('th', 'Date'),
+                          m('th', 'Description'),
+                          m('th.right', 'Amount'),
+                          m('th', 'Category'),
+                        ])),
+                        m('tbody', s.preview.map((row, i) =>
+                          m('tr', { class: row.amount < 0 ? 'debit' : 'credit' }, [
+                            m('td.mono', fmtDate(row.postDate)),
+                            m('td.desc', row.description),
+                            m('td.amount.right.mono', fmtAmount(row.amount)),
+                            m('td', m('select.cat-select', {
+                              value: row.categoryId,
+                              onchange(e) {
+                                const newId = parseInt(e.target.value, 10);
+                                s.preview[i].categoryId      = newId;
+                                s.preview[i].isUserCorrected = true;
+                                const cat = s.categories.find(c => c.id === newId);
+                                if (cat) s.preview[i].categoryName = cat.name;
+                                m.redraw();
+                              },
+                            }, s.categories.map(cat =>
+                              m('option', { value: cat.id, selected: cat.id === row.categoryId }, cat.name)
+                            ))),
+                          ])
+                        )),
+                      ])
+                    ),
+                  ],
+
+                  // Done
+                  s.stage === 'done' && m('div.import-done', [
+                    m('div.done-icon', '✅'),
+                    m('h2', 'Import complete'),
+                    m('p.done-stat', [m('strong', s.stats.imported), ' transactions imported']),
+                    s.stats.skipped > 0 && m('p.done-skipped', `${s.stats.skipped} duplicate${s.stats.skipped !== 1 ? 's' : ''} skipped`),
+                    m('button.btn.btn-primary', {
+                      onclick() { s.stage = 'idle'; s.preview = []; s.stats = null; s.pendingFilename = null; m.redraw(); },
+                    }, 'Import another file'),
+                  ]),
+
+                  // Error
+                  s.stage === 'error' && m('div.import-error', [
+                    m('p', `⚠\uFE0F ${s.importError}`),
+                    m('button.btn', {
+                      onclick() { s.stage = 'idle'; s.importError = null; s.pendingFilename = null; m.redraw(); },
+                    }, 'Try again'),
+                  ]),
+                ]),
+
+                // Import history
+                s.batches.length > 0 && m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Import history'),
+                  m('div.import-batch-list',
+                    s.batches.map(batch =>
+                      m('div.import-batch-row', [
+                        m('div.import-batch-meta', [
+                          m('span.import-batch-filename', batch.filename || 'Unknown file'),
+                          m('span.import-batch-date', fmtDateTime(batch.imported_at)),
+                        ]),
+                        m('span.import-batch-count', `${batch.tx_count} tx`),
+                        m('select.cat-select.import-batch-account', {
+                          onchange(e) {
+                            const newId = e.target.value ? parseInt(e.target.value, 10) : null;
+                            batch.account_id = newId;
+                            window.api.imports.setAccount(batch.id, newId);
+                          },
+                        }, [
+                          m('option', { value: '', selected: !batch.account_id }, ''),
+                          ...s.accounts.map(acct =>
+                            m('option', { value: acct.id, selected: acct.id === batch.account_id }, acct.name)
+                          ),
+                        ]),
+                        m('button.btn.icon-btn.delete-btn', {
+                          title: 'Delete all transactions from this import',
+                          async onclick() {
+                            const label = batch.filename || 'this import';
+                            if (!window.confirm(`Delete all ${batch.tx_count} transaction${batch.tx_count !== 1 ? 's' : ''} from \u201c${label}\u201d? This cannot be undone.`)) return;
+                            await window.api.imports.delete(batch.id);
+                            s.batches = s.batches.filter(b => b.id !== batch.id);
+                            m.redraw();
+                          },
+                        }, '\uD83D\uDDD1'),
+                      ])
+                    )
+                  ),
+                ]),
+              ]),
+
+              // ── Integrations ──────────────────────────────────────────────
+              s.activeSection === 'integrations' && m('div.settings-section', [
+                m('h2.section-title', 'Integrations'),
+
+                m('div.settings-field-group', [
+                  m('h3.settings-subheading', 'Google Calendar'),
+                  m('p.section-hint', 'Push your bills to Google Calendar so they appear alongside meetings and appointments.'),
+
+                  m('div.gcal-header', [
+                    s.gcal.connected && [
+                      m('span.gcal-connected-badge', `✓ ${s.gcal.email}`),
+                      m('div.gcal-header-actions', [
+                        s.syncResult && m('span.sync-result', s.syncResult),
+                        m('button.btn.btn-ghost', {
+                          onclick() { self.syncAll(vnode); },
+                        }, 'Sync all'),
+                        m('button.btn.btn-ghost', {
+                          onclick() { self.disconnectGcal(vnode); },
+                        }, 'Disconnect'),
+                      ]),
+                    ],
+                  ]),
+
+                  !s.gcal.connected && [
+                    s.showGcalSetup
+                      ? m('div.gcal-setup', [
+                          s.gcal.hasEnvCredentials
+                            ? m('p.section-hint', 'Credentials loaded from .env — click Connect to authorize.')
+                            : [
+                                m('p.section-hint', [
+                                  '1. Open ',
+                                  m('a.ext-link', {
+                                    href: '#',
+                                    onclick(e) {
+                                      e.preventDefault();
+                                      window.api.shell.openExternal('https://console.cloud.google.com/apis/credentials');
+                                    },
+                                  }, 'Google Cloud Console'),
+                                  ' \u2192 select or create a project',
+                                ]),
+                                m('p.section-hint', '2. Enable the Google Calendar API \u2192 Create Credentials \u2192 OAuth client ID \u2192 Desktop app'),
+                                m('p.section-hint', '3. Paste your credentials below and click Connect:'),
+                                m('input.form-input', {
+                                  placeholder: 'Client ID',
+                                  value:       s.gcalForm.clientId,
+                                  oninput:     e => { s.gcalForm.clientId = e.target.value; },
+                                }),
+                                m('input.form-input', {
+                                  placeholder: 'Client Secret',
+                                  type:        'password',
+                                  value:       s.gcalForm.clientSecret,
+                                  oninput:     e => { s.gcalForm.clientSecret = e.target.value; },
+                                }),
+                              ],
+                          s.gcalError && m('p.error-msg', s.gcalError),
+                          m('div.form-actions', [
+                            m('button.btn.btn-ghost', {
+                              onclick() { s.showGcalSetup = false; s.gcalError = null; },
+                            }, 'Cancel'),
+                            m('button.btn.btn-primary', {
+                              disabled: (!s.gcal.hasEnvCredentials && (!s.gcalForm.clientId || !s.gcalForm.clientSecret)) || s.gcalConnecting,
+                              onclick()  { self.connectGcal(vnode); },
+                            }, s.gcalConnecting ? 'Waiting for browser…' : 'Connect'),
+                          ]),
+                        ])
+                      : m('div.gcal-prompt', [
+                          m('button.btn.btn-primary', {
+                            onclick() { s.showGcalSetup = true; },
+                          }, 'Connect Google Calendar'),
+                        ]),
+                  ],
+                ]),
+              ]),
+
+              // ── Danger Zone ───────────────────────────────────────────────
+              s.activeSection === 'danger' && m('div.settings-section.settings-section--danger', [
+                m('h2.section-title', 'Danger Zone'),
+                m('p.section-hint', 'Deletions are immediate and permanent.'),
+                m('div.dz-btn-list',
+                  WIPE_TARGETS.map(t =>
+                    m('button.dz-wipe-btn', {
+                      class:    t.id === 'all' ? 'dz-wipe-btn--all' : '',
+                      disabled: s.wiping !== null,
+                      onclick() { self.wipe(vnode, t.id); },
+                    }, [
+                      m('span.dz-wipe-label', `Wipe ${t.label}`),
+                      m('span.dz-wipe-detail', t.detail),
+                    ])
+                  )
+                ),
+              ]),
+
+            ], // end !loading
+          ]),
+        ]),
+      ]);
+    },
+  };
+
+  window.Routes          = window.Routes || {};
+  window.Routes.Settings = SettingsRoute;
+}());

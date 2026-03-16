@@ -84,12 +84,6 @@
       s.editId       = null;
       s.editForm     = defaultForm();
       s.editSaving   = false;
-      // Google Calendar setup
-      s.showGcalSetup  = false;
-      s.gcalForm       = { clientId: '', clientSecret: '' };
-      s.gcalConnecting = false;
-      s.gcalError      = null;
-      s.syncResult     = null;
       // Per-bill sync in-flight tracking
       s.syncing = {};
       loadData(vnode);
@@ -168,43 +162,6 @@
       loadData(vnode);
     },
 
-    async connectGcal(vnode) {
-      const s = vnode.state;
-      const clientId     = s.gcal.hasEnvCredentials ? '' : s.gcalForm.clientId;
-      const clientSecret = s.gcal.hasEnvCredentials ? '' : s.gcalForm.clientSecret;
-      if (!s.gcal.hasEnvCredentials && (!clientId || !clientSecret)) return;
-      s.gcalConnecting = true;
-      s.gcalError      = null;
-      m.redraw();
-      const result = await window.api.gcal.authorize({ clientId, clientSecret });
-      s.gcalConnecting = false;
-      if (result.ok) {
-        s.gcal         = { connected: true, email: result.email };
-        s.showGcalSetup = false;
-      } else {
-        s.gcalError = result.error;
-      }
-      m.redraw();
-    },
-
-    async disconnectGcal(vnode) {
-      await window.api.gcal.disconnect();
-      vnode.state.gcal = { connected: false, email: null };
-      loadData(vnode);
-    },
-
-    async syncAll(vnode) {
-      const s = vnode.state;
-      s.syncResult = null;
-      m.redraw();
-      const result = await window.api.gcal.syncAll();
-      s.syncResult = result.failed === 0
-        ? `Synced ${result.synced} bill${result.synced !== 1 ? 's' : ''} to Google Calendar`
-        : `${result.synced} synced, ${result.failed} failed: ${result.errors.join('; ')}`;
-      loadData(vnode);
-      setTimeout(() => { vnode.state.syncResult = null; m.redraw(); }, 5000);
-    },
-
     view(vnode) {
       const s    = vnode.state;
       const self = this;
@@ -259,10 +216,10 @@
           m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
           m(m.route.Link, { href: '/insights',  class: 'nav-link' }, 'Insights'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link active' }, 'Bills'),
-          m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
           m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
           m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/settings',     class: 'nav-link' }, 'Settings'),
         ]),
 
         m('div.bills-body', [
@@ -433,75 +390,6 @@
                       ]
                   );
                 })),
-
-            // ── Google Calendar section ───────────────────────────────────
-            m('div.gcal-section', [
-              m('div.gcal-header', [
-                m('h2.section-title', 'Google Calendar'),
-                s.gcal.connected && [
-                  m('span.gcal-connected-badge', `✓ ${s.gcal.email}`),
-                  m('div.gcal-header-actions', [
-                    s.syncResult && m('span.sync-result', s.syncResult),
-                    m('button.btn.btn-ghost', {
-                      onclick() { self.syncAll(vnode); },
-                    }, 'Sync all'),
-                    m('button.btn.btn-ghost', {
-                      onclick() { self.disconnectGcal(vnode); },
-                    }, 'Disconnect'),
-                  ]),
-                ],
-              ]),
-
-              !s.gcal.connected && [
-                s.showGcalSetup
-                  ? m('div.gcal-setup', [
-                      s.gcal.hasEnvCredentials
-                        ? m('p.section-hint', 'Credentials loaded from .env — click Connect to authorize.')
-                        : [
-                            m('p.section-hint', [
-                              '1. Open ',
-                              m('a.ext-link', {
-                                href: '#',
-                                onclick(e) {
-                                  e.preventDefault();
-                                  window.api.shell.openExternal('https://console.cloud.google.com/apis/credentials');
-                                },
-                              }, 'Google Cloud Console'),
-                              ' \u2192 select or create a project',
-                            ]),
-                            m('p.section-hint', '2. Enable the Google Calendar API \u2192 Create Credentials \u2192 OAuth client ID \u2192 Desktop app'),
-                            m('p.section-hint', '3. Paste your credentials below and click Connect:'),
-                            m('input.form-input', {
-                              placeholder: 'Client ID',
-                              value: s.gcalForm.clientId,
-                              oninput: e => { s.gcalForm.clientId = e.target.value; },
-                            }),
-                            m('input.form-input', {
-                              placeholder: 'Client Secret',
-                              type: 'password',
-                              value: s.gcalForm.clientSecret,
-                              oninput: e => { s.gcalForm.clientSecret = e.target.value; },
-                            }),
-                          ],
-                      s.gcalError && m('p.error-msg', s.gcalError),
-                      m('div.form-actions', [
-                        m('button.btn.btn-ghost', {
-                          onclick() { s.showGcalSetup = false; s.gcalError = null; },
-                        }, 'Cancel'),
-                        m('button.btn.btn-primary', {
-                          disabled: (!s.gcal.hasEnvCredentials && (!s.gcalForm.clientId || !s.gcalForm.clientSecret)) || s.gcalConnecting,
-                          onclick()  { self.connectGcal(vnode); },
-                        }, s.gcalConnecting ? 'Waiting for browser…' : 'Connect'),
-                      ]),
-                    ])
-                  : m('div.gcal-prompt', [
-                      m('p', 'Push your bills to Google Calendar so they appear alongside meetings and appointments.'),
-                      m('button.btn.btn-primary', {
-                        onclick() { s.showGcalSetup = true; },
-                      }, 'Connect Google Calendar'),
-                    ]),
-              ],
-            ]),
 
           ], // end !loading
         ]),

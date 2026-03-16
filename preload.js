@@ -41,9 +41,16 @@ contextBridge.exposeInMainWorld('api', {
 
   bills: {
     list:   (opts) => ipcRenderer.invoke('bills:list',   opts),
-    detect: ()     => ipcRenderer.invoke('bills:detect'),
+    detect: (opts) => ipcRenderer.invoke('bills:detect', opts),
     save:   bill   => ipcRenderer.invoke('bills:save',   bill),
     delete: id     => ipcRenderer.invoke('bills:delete', id),
+  },
+
+  insights: {
+    categoryComparison: (opts) => ipcRenderer.invoke('insights:category-comparison', opts),
+    categoryTrends:     (opts) => ipcRenderer.invoke('insights:category-trends',     opts),
+    spiralPattern:      (opts) => ipcRenderer.invoke('insights:spiral-pattern',      opts),
+    milestones:         ()     => ipcRenderer.invoke('insights:milestones'),
   },
 
   settings: {

@@ -49,8 +49,6 @@
       s.summary  = summary;
       s.accounts = accounts;
       s.loading  = false;
-      s.pa.value = summary.paycheckAmountOverride || '';
-
       m.redraw();
     }).catch(err => {
       s.error   = err.message || String(err);
@@ -70,41 +68,12 @@
       s.accounts = [];
       s.error    = null;
       s.selectedAccountId = null;  // null = all accounts
-      // Paycheck setup form state
-      s.pf = { open: false, frequency: 'biweekly', lastDate: '', saving: false };
-      // Paycheck amount override state
-      s.pa = { value: '', saving: false };
-      loadData(vnode);
-    },
-
-    async savePaycheck(vnode) {
-      const s = vnode.state;
-      if (!s.pf.lastDate) return;
-      s.pf.saving = true;
-      m.redraw();
-      await Promise.all([
-        window.api.settings.set('paycheck_frequency', s.pf.frequency),
-        window.api.settings.set('paycheck_last_date',  s.pf.lastDate),
-        window.api.settings.set('paycheck_amount',     s.pa.value),
-      ]);
-      s.pf.open   = false;
-      s.pf.saving = false;
-      loadData(vnode);
-    },
-
-    async savePaycheckAmount(vnode) {
-      const s = vnode.state;
-      s.pa.saving = true;
-      m.redraw();
-      await window.api.settings.set('paycheck_amount', s.pa.value);
-      s.pa.saving = false;
       loadData(vnode);
     },
 
     view(vnode) {
-      const s    = vnode.state;
-      const self = this;
-      const sum  = s.summary;
+      const s   = vnode.state;
+      const sum = s.summary;
 
       const STATUS = {
         ok:      { icon: '✅', label: "You're okay",          cls: 'ok'      },
@@ -199,6 +168,10 @@
                   m('span.outlook-row-label', 'Bills before paycheck'),
                   m('span.outlook-row-value.red', '\u2212' + fmtMoney(sum.billsBeforeNextTotal)),
                 ]),
+                sum.buffer > 0 && m('div.outlook-row', [
+                  m('span.outlook-row-label', 'Buffer'),
+                  m('span.outlook-row-value.muted', '\u2212' + fmtMoney(sum.buffer)),
+                ]),
                 m('div.outlook-row.outlook-row--divider.outlook-row--total', [
                   m('span.outlook-row-label', 'Free to spend'),
                   m('span.outlook-row-value', {
@@ -266,10 +239,10 @@
           m(m.route.Link, { href: '/dashboard', class: 'nav-link active' }, 'Dashboard'),
           m(m.route.Link, { href: '/insights',  class: 'nav-link' }, 'Insights'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link' }, 'Bills'),
-          m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
           m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
           m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
+          m(m.route.Link, { href: '/settings',     class: 'nav-link' }, 'Settings'),
         ]),
 
         m('div.dashboard-body', [
@@ -346,14 +319,8 @@
                 sum.daysUntilPaycheck != null ? [
                   m('div.card-value', daysText(sum.daysUntilPaycheck)),
                   m('div.card-sub', sum.nextPaycheckDate ? fmtDate(sum.nextPaycheckDate) : ''),
-                  m('button.btn.btn-ghost.card-edit-btn', {
-                    onclick() { s.pf.open = !s.pf.open; s.pf.frequency = sum.paycheckFrequency || 'biweekly'; s.pf.lastDate = sum.paycheckLastDate || ''; },
-                  }, s.pf.open ? 'cancel' : 'edit'),
                 ] : [
                   m('div.card-value.muted', 'Not set up'),
-                  m('button.btn.btn-primary.card-cta-btn', {
-                    onclick() { s.pf.open = true; },
-                  }, 'Configure'),
                 ],
 
                 // Estimated / overridden paycheck amount (always visible)
@@ -363,39 +330,7 @@
                     : 'Amount unknown'
                 ),
 
-                // Inline paycheck setup form
-                s.pf.open && m('div.inline-form', [
-                  m('label.form-label', 'Frequency'),
-                  m('select.cat-select', {
-                    value: s.pf.frequency,
-                    onchange: e => { s.pf.frequency = e.target.value; },
-                  }, [
-                    m('option', { value: 'weekly'      }, 'Weekly'),
-                    m('option', { value: 'biweekly'    }, 'Every 2 weeks'),
-                    m('option', { value: 'semimonthly' }, 'Twice a month (1st & 15th)'),
-                    m('option', { value: 'monthly'     }, 'Monthly'),
-                  ]),
-                  m('label.form-label', 'Last paycheck date'),
-                  m('input.form-input[type=date]', {
-                    value: s.pf.lastDate,
-                    oninput: e => { s.pf.lastDate = e.target.value; },
-                  }),
-                  m('label.form-label', 'Paycheck amount'),
-                  m('input.form-input[type=number]', {
-                    placeholder: 'Override amount',
-                    value: s.pa.value,
-                    oninput: e => { s.pa.value = e.target.value; },
-                  }),
-                  m('div.form-actions', [
-                    m('button.btn.btn-ghost', {
-                      onclick() { s.pf.open = false; },
-                    }, 'Cancel'),
-                    m('button.btn.btn-primary', {
-                      disabled: !s.pf.lastDate || s.pf.saving,
-                      onclick()  { self.savePaycheck(vnode); },
-                    }, s.pf.saving ? 'Saving…' : 'Save'),
-                  ]),
-                ]),
+                m(m.route.Link, { href: '/settings', class: 'btn btn-ghost card-edit-btn' }, 'Configure →'),
               ]),
 
               // Next bill
