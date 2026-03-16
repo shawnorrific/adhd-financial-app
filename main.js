@@ -486,6 +486,7 @@ ipcMain.handle('insights:spiral-pattern', (_, { accountId } = {}) => {
         WHERE  c2.name = 'Income'
           AND  t2.post_date >= date(t.post_date, '-3 days')
           AND  t2.post_date <= t.post_date
+          AND  t2.account_id = t.account_id
       )
     ORDER  BY t.post_date
   `, acctParams);
@@ -528,6 +529,7 @@ ipcMain.handle('insights:spiral-pattern', (_, { accountId } = {}) => {
 });
 
 ipcMain.handle('insights:milestones', () => {
+  const dayAfter = d => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().split('T')[0]; };
   const fdThreshold = parseFloat(
     db.get("SELECT value FROM settings WHERE key = 'food_delivery_milestone_threshold'")?.value || '800'
   );
@@ -552,6 +554,7 @@ ipcMain.handle('insights:milestones', () => {
 
   const raw    = db.get("SELECT value FROM settings WHERE key = 'earned_milestones'")?.value;
   const earned = raw ? JSON.parse(raw) : {};
+  const earnedSnapshot = JSON.stringify(earned);
 
   if (!earned['first-month-food-delivery']) {
     const row = db.get(`
@@ -594,7 +597,7 @@ ipcMain.handle('insights:milestones', () => {
               (new Date(overdrafts[i + 1].post_date) - new Date(overdrafts[i].post_date)) / 86400000
             );
             if (gap >= 30) {
-              earned['first-30-days-no-overdraft'] = overdrafts[i].post_date;
+              earned['first-30-days-no-overdraft'] = dayAfter(overdrafts[i].post_date);
               found = true;
               break;
             }
@@ -602,7 +605,7 @@ ipcMain.handle('insights:milestones', () => {
           if (!found) {
             const last      = overdrafts[overdrafts.length - 1].post_date;
             const daysSince = Math.round((new Date() - new Date(last)) / 86400000);
-            if (daysSince >= 30) earned['first-30-days-no-overdraft'] = last;
+            if (daysSince >= 30) earned['first-30-days-no-overdraft'] = dayAfter(last);
           }
         }
       }
@@ -610,14 +613,16 @@ ipcMain.handle('insights:milestones', () => {
   }
 
   if (!earned['bills-added']) {
-    const count = db.get('SELECT COUNT(*) AS n FROM bills WHERE is_active = 1')?.n || 0;
-    if (count > 0) earned['bills-added'] = new Date().toISOString().split('T')[0];
+    const row = db.get('SELECT MIN(created_at) AS d FROM bills WHERE is_active = 1');
+    if (row?.d) earned['bills-added'] = row.d.split('T')[0];
   }
 
-  db.run(
-    "INSERT INTO settings (key, value) VALUES ('earned_milestones', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    [JSON.stringify(earned)]
-  );
+  if (JSON.stringify(earned) !== earnedSnapshot) {
+    db.run(
+      "INSERT INTO settings (key, value) VALUES ('earned_milestones', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      [JSON.stringify(earned)]
+    );
+  }
 
   return MILESTONES
     .filter(ms => earned[ms.id])

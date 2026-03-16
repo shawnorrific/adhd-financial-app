@@ -209,7 +209,7 @@
                 const pct  = cat.last_month > 0 ? diff / cat.last_month * 100 : 100;
                 const up20 = diff > 0 && pct > 20;
                 const clr  = diff > 0 ? '#ef4444' : diff < 0 ? '#22c55e' : '#9ca3af';
-                return m('div.spend-row', [
+                return m('div.spend-row', { key: cat.name }, [
                   m('div.spend-name', { class: cat.is_impulse ? 'impulse' : '' }, cat.name),
                   m('div', { style: 'display:flex; align-items:center; margin-left:auto;' }, [
                     m('div.spend-amount.mono', {
@@ -257,7 +257,7 @@
               m('h2.section-title', '3-month category trend'),
               colHeader([monthLabel(2), monthLabel(1), monthLabel(0)]),
               m('div.spend-bars', (s.catTrends || []).map(cat =>
-                m('div.spend-row', [
+                m('div.spend-row', { key: cat.name }, [
                   m('div.spend-name', { class: cat.is_impulse ? 'impulse' : '' }, cat.name),
                   m('div', { style: 'display:flex; align-items:center; margin-left:auto;' }, [
                     m('div.spend-amount.mono', {
@@ -283,7 +283,7 @@
                 m('p.section-hint',
                   'These charges appear monthly at a consistent amount and aren\'t tracked as bills.'),
                 m('div.detect-list', untracked.map(d =>
-                  m('div.detect-row', [
+                  m('div.detect-row', { key: d.description }, [
                     m('div.detect-info', [
                       m('div.detect-name', d.description),
                       m('div.detect-meta', [
@@ -319,7 +319,7 @@
             s.milestones?.length > 0 && m('div.detect-section', [
               m('h2.section-title', 'Milestones'),
               m('div.detect-list', s.milestones.map(item =>
-                m('div.detect-row', [
+                m('div.detect-row', { key: item.id }, [
                   m('div.detect-info', [
                     m('div.detect-name', ['\u2713 ', item.label]),
                     m('div.detect-meta', item.description),
