@@ -216,7 +216,6 @@
           m(m.route.Link, { href: '/dashboard', class: 'nav-link' }, 'Dashboard'),
           m(m.route.Link, { href: '/insights',  class: 'nav-link' }, 'Insights'),
           m(m.route.Link, { href: '/bills',     class: 'nav-link active' }, 'Bills'),
-          m(m.route.Link, { href: '/import',    class: 'nav-link' }, 'Import CSV'),
           m(m.route.Link, { href: '/accounts',  class: 'nav-link' }, 'Accounts'),
           m(m.route.Link, { href: '/transactions', class: 'nav-link' }, 'Transactions'),
           m(m.route.Link, { href: '/purchase',     class: 'nav-link' }, 'May I Buy?'),
