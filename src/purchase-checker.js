@@ -56,11 +56,11 @@ function checkPurchase(itemName, cost) {
   const billsDue7 = [];
 
   for (const bill of activeBills) {
-    const dueDate = nextDueDate(bill.due_day, today);
-    if (dueDate <= in7Days) {
-      billsDue7Total += bill.amount;
-      billsDue7.push({ name: bill.name, amount: bill.amount, dueDate });
-    }
+    const { nextDate: dueDate } = nextDueDate(bill.due_day, today);
+      if (dueDate <= in7Days) {
+        billsDue7Total += bill.amount;
+        billsDue7.push({ name: bill.name, amount: bill.amount, dueDate });
+}
   }
 
   const availableNow  = currentBalance - billsDue7Total;
@@ -92,7 +92,7 @@ function checkPurchase(itemName, cost) {
   if (nextPaycheckDate) {
     for (const bill of activeBills) {
       if (!bill.amount) continue;
-      const dueDate = nextDueDate(bill.due_day, today);
+      const { nextDate: dueDate } = nextDueDate(bill.due_day, today);
       if (dueDate < nextPaycheckDate) billsBeforePaycheckTotal += bill.amount;
     }
   }

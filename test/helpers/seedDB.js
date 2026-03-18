@@ -58,4 +58,42 @@ function seedSettings(overrides = {}) {
   }
 }
 
-module.exports = { setupSchema, seedSettings };
+function seedCategory(name = 'Income', isImpulse = 0) {
+  db.run(
+    'INSERT OR IGNORE INTO categories (name, is_impulse) VALUES (?, ?)',
+    [name, isImpulse]
+  );
+}
+
+function seedIncome(amount, daysAgo) {
+  const date = new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+  db.run(
+    `INSERT INTO transactions (amount, post_date, category_id)
+     VALUES (?, ?, (SELECT id FROM categories WHERE name = 'Income' LIMIT 1))`,
+    [amount, date]
+  );
+}
+
+function seedBalance(balance, daysAgo = 0) {
+  const date = new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+  db.run(
+    'INSERT INTO transactions (balance, post_date) VALUES (?, ?)',
+    [balance, date]
+  );
+}
+
+function seedBill(name, amount, due_day, is_active = 1) {
+  db.run(
+    'INSERT INTO bills (name, amount, due_day, is_active) VALUES (?, ?, ?, ?)',
+    [name, amount, due_day, is_active]
+  );
+}
+
+function clearTables() {
+  db.run('DELETE FROM transactions');
+  db.run('DELETE FROM bills');
+  db.run('DELETE FROM settings');
+  db.run('DELETE FROM categories');
+}
+
+module.exports = { setupSchema, seedSettings, seedCategory, seedIncome, seedBalance, seedBill, clearTables };
