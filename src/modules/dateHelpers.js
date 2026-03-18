@@ -1,6 +1,6 @@
 'use strict';
 
-const {toISO} = require('./calcNextPaycheck');
+const { toISO } = require('../modules/calcNextPaycheck');
 
 /** Number of calendar days from ISO string `a` to ISO string `b`. */
 function daysBetween(aISO, bISO) {
@@ -11,7 +11,7 @@ function daysBetween(aISO, bISO) {
  * Given a bill's due_day (1–28), find its next occurrence from today and the
  * number of days away.
  */
-function nextDueInfo(dueDay, todayISO) {
+function nextDueDate(dueDay, todayISO) {
   const today   = new Date(todayISO + 'T00:00:00');
   const year    = today.getFullYear();
   const month   = today.getMonth();
@@ -28,4 +28,4 @@ function nextDueInfo(dueDay, todayISO) {
   };
 }
 
-module.exports = { daysBetween, nextDueInfo };
+module.exports = { daysBetween, nextDueDate };

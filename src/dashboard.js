@@ -3,7 +3,7 @@
 const db = require('../db');
 const { calcCushion } = require('./modules/cushion');
 const { calcNextPaycheck, toISO } = require('./modules/calcNextPaycheck');
-const { daysBetween, nextDueInfo } = require('./modules/dateHelpers');
+const { daysBetween, nextDueDate } = require('./modules/dateHelpers');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ function getSummary(accountId = null) {
   let nextBill          = null;
   let nextBillDaysUntil = Infinity;
   for (const bill of bills) {
-    const { daysUntil } = nextDueInfo(bill.due_day, today);
+    const { daysUntil } = nextDueDate(bill.due_day, today);
     if (daysUntil < nextBillDaysUntil) {
       nextBill          = bill;
       nextBillDaysUntil = daysUntil;
@@ -135,7 +135,7 @@ function getSummary(accountId = null) {
   if (nextNextPaycheckDate) {
     for (const bill of bills) {
       if (!bill.amount) continue;
-      const { nextDate } = nextDueInfo(bill.due_day, today);
+      const { nextDate } = nextDueDate(bill.due_day, today);
       if (nextDate <= nextNextPaycheckDate) {
         upcomingBillsTotal += bill.amount;
         upcomingBills.push({ ...bill, nextDate });
