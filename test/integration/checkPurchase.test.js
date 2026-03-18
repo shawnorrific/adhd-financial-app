@@ -90,8 +90,10 @@ describe('checkPurchase()', () => {
     it('includes next paycheck date when configured', () => {
       seedBalance(300);
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      seedSettings('paycheck_frequency', 'biweekly');
-      seedSettings('paycheck_last_date', yesterday);
+      seedSettings({
+        paycheck_frequency: 'biweekly',
+        paycheck_last_date: yesterday,
+      });
       const result = checkPurchase('TV', 500);
       assert.ok(result.suggestedDate);
       assert.ok(result.explanation.includes('wait until'));;
@@ -116,8 +118,10 @@ describe('checkPurchase()', () => {
     it('falls back to next paycheck date when no income history exists', () => {
       seedBalance(100);
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      seedSettings('paycheck_frequency', 'biweekly');
-      seedSettings('paycheck_last_date', yesterday);
+      seedSettings({
+        paycheck_frequency: 'biweekly',
+        paycheck_last_date: yesterday,
+      });
       const result = checkPurchase('Item', 400);
       assert.ok(result.suggestedDate);
     });
@@ -125,8 +129,10 @@ describe('checkPurchase()', () => {
     it('suggests the paycheck-after-next when one paycheck is not enough', () => {
       seedBalance(100);
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      seedSettings('paycheck_frequency', 'biweekly');
-      seedSettings('paycheck_last_date', yesterday);
+      seedSettings({
+        paycheck_frequency: 'biweekly',
+        paycheck_last_date: yesterday,
+      });
       // Seed a small income so estimatedPaycheck is well below the cost
       seedIncome(500, 14);
       const result = checkPurchase('Very Expensive Item', 2000);
