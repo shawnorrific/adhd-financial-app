@@ -19,8 +19,7 @@ function getSetting(key) {
  *
  * @param {number|null} accountId
  */
-function getSummary(accountId = null) {
-  const today = toISO(new Date());
+function getSummary(accountId = null, today = toISO(new Date())) {
   const monthStart = today.substring(0, 7) + '-01';
 
   const acctWhere  = accountId ? 'AND account_id = ?' : '';
