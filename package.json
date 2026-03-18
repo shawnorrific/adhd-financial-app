@@ -5,9 +5,11 @@
   "description": "Local-first personal finance app for ADHD brains",
   "main": "main.js",
   "scripts": {
+    "prestart": "node scripts/rebuild.js",
     "start": "electron .",
     "rebuild": "node scripts/rebuild.js",
-    "postinstall": "node scripts/rebuild.js"
+    "postinstall": "node scripts/rebuild.js",
+    "test": "npm rebuild better-sqlite3 && NODE_ENV=test mocha test/unit/**/*.test.js test/integration/**/*.test.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",
@@ -15,7 +17,9 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
-    "electron": "^36.9.5"
+    "chai": "^4.5.0",
+    "electron": "^36.9.5",
+    "mocha": "^11.7.5"
   },
   "license": "MIT"
 }

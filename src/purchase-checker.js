@@ -1,66 +1,14 @@
 'use strict';
 
 const db = require('../db');
+const { fmtDate, fmtMoney } = require('./modules/formatters');
+const { toISO, calcNextPaycheck } = require('./modules/calcNextPaycheck');
+const { daysBetween, nextDueDate } = require('./modules/dateHelpers');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getSetting(key) {
   return db.get('SELECT value FROM settings WHERE key = ?', [key])?.value ?? null;
-}
-
-function toISO(d) {
-  return d.toISOString().split('T')[0];
-}
-
-function daysBetween(aISO, bISO) {
-  return Math.round(
-    (new Date(bISO + 'T00:00:00') - new Date(aISO + 'T00:00:00')) / 86400000
-  );
-}
-
-function nextDueDate(dueDay, todayISO) {
-  const today = new Date(todayISO + 'T00:00:00');
-  let candidate = new Date(today.getFullYear(), today.getMonth(), dueDay);
-  if (toISO(candidate) <= todayISO) {
-    candidate = new Date(today.getFullYear(), today.getMonth() + 1, dueDay);
-  }
-  return toISO(candidate);
-}
-
-function fmtMoney(n) {
-  if (n == null || isNaN(n)) return '$—';
-  const [int, dec] = Math.abs(n).toFixed(2).split('.');
-  return '$' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
-}
-
-function fmtDate(iso) {
-  if (!iso) return '—';
-  const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                  'Jul','Aug','Sep','Oct','Nov','Dec'];
-  const [, mo, d] = iso.split('-');
-  return `${months[parseInt(mo, 10) - 1]} ${parseInt(d, 10)}`;
-}
-
-function calcNextPaycheck(frequency, lastDateStr, nowISO) {
-  let next = new Date(lastDateStr + 'T00:00:00');
-
-  const advance = () => {
-    switch (frequency) {
-      case 'weekly':        next.setDate(next.getDate() + 7);  break;
-      case 'biweekly':      next.setDate(next.getDate() + 14); break;
-      case 'semimonthly': {
-        const d = next.getDate();
-        if (d < 15) { next.setDate(15); }
-        else { next.setMonth(next.getMonth() + 1); next.setDate(1); }
-        break;
-      }
-      case 'monthly': next.setMonth(next.getMonth() + 1); break;
-      default:        next.setDate(next.getDate() + 14);
-    }
-  };
-
-  while (toISO(next) < nowISO) advance();
-  return toISO(next);
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -108,11 +56,11 @@ function checkPurchase(itemName, cost) {
   const billsDue7 = [];
 
   for (const bill of activeBills) {
-    const dueDate = nextDueDate(bill.due_day, today);
-    if (dueDate <= in7Days) {
-      billsDue7Total += bill.amount;
-      billsDue7.push({ name: bill.name, amount: bill.amount, dueDate });
-    }
+    const { nextDate: dueDate } = nextDueDate(bill.due_day, today);
+      if (dueDate <= in7Days) {
+        billsDue7Total += bill.amount;
+        billsDue7.push({ name: bill.name, amount: bill.amount, dueDate });
+}
   }
 
   const availableNow  = currentBalance - billsDue7Total;
@@ -144,7 +92,7 @@ function checkPurchase(itemName, cost) {
   if (nextPaycheckDate) {
     for (const bill of activeBills) {
       if (!bill.amount) continue;
-      const dueDate = nextDueDate(bill.due_day, today);
+      const { nextDate: dueDate } = nextDueDate(bill.due_day, today);
       if (dueDate < nextPaycheckDate) billsBeforePaycheckTotal += bill.amount;
     }
   }

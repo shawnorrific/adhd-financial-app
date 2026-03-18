@@ -1,70 +1,14 @@
 'use strict';
 
 const db = require('../db');
+const { calcCushion } = require('./modules/cushion');
+const { calcNextPaycheck, toISO } = require('./modules/calcNextPaycheck');
+const { daysBetween, nextDueDate } = require('./modules/dateHelpers');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getSetting(key) {
   return db.get('SELECT value FROM settings WHERE key = ?', [key])?.value ?? null;
-}
-
-/** Format a Date to an ISO date string "YYYY-MM-DD". */
-function toISO(d) {
-  return d.toISOString().split('T')[0];
-}
-
-/** Number of calendar days from ISO string `a` to ISO string `b`. */
-function daysBetween(aISO, bISO) {
-  return Math.round((new Date(bISO + 'T00:00:00') - new Date(aISO + 'T00:00:00')) / 86400000);
-}
-
-/**
- * Walk forward from `lastDateStr` by one pay period at a time until we reach
- * a date that is >= today.  Uses ISO string comparison so timezone drift can't
- * push us to the wrong date.
- */
-function calcNextPaycheck(frequency, lastDateStr, nowISO) {
-  let next = new Date(lastDateStr + 'T00:00:00');
-
-  const advance = () => {
-    switch (frequency) {
-      case 'weekly':        next.setDate(next.getDate() + 7);  break;
-      case 'biweekly':      next.setDate(next.getDate() + 14); break;
-      case 'semimonthly': {
-        const d = next.getDate();
-        if (d < 15) { next.setDate(15); }
-        else        { next.setMonth(next.getMonth() + 1); next.setDate(1); }
-        break;
-      }
-      case 'monthly': next.setMonth(next.getMonth() + 1); break;
-      default:        next.setDate(next.getDate() + 14);
-    }
-  };
-
-  // Advance until the candidate date is today or in the future
-  while (toISO(next) < nowISO) advance();
-  return toISO(next);
-}
-
-/**
- * Given a bill's due_day (1–28), find its next occurrence from today and the
- * number of days away.
- */
-function nextDueInfo(dueDay, todayISO) {
-  const today   = new Date(todayISO + 'T00:00:00');
-  const year    = today.getFullYear();
-  const month   = today.getMonth();
-  let candidate = new Date(year, month, dueDay);
-
-  // If the due date has already passed this month, move to next month
-  if (toISO(candidate) <= todayISO) {
-    candidate = new Date(year, month + 1, dueDay);
-  }
-
-  return {
-    nextDate:  toISO(candidate),
-    daysUntil: daysBetween(todayISO, toISO(candidate)),
-  };
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -75,8 +19,7 @@ function nextDueInfo(dueDay, todayISO) {
  *
  * @param {number|null} accountId
  */
-function getSummary(accountId = null) {
-  const today = toISO(new Date());
+function getSummary(accountId = null, today = toISO(new Date())) {
   const monthStart = today.substring(0, 7) + '-01';
 
   const acctWhere  = accountId ? 'AND account_id = ?' : '';
@@ -174,7 +117,7 @@ function getSummary(accountId = null) {
   let nextBill          = null;
   let nextBillDaysUntil = Infinity;
   for (const bill of bills) {
-    const { daysUntil } = nextDueInfo(bill.due_day, today);
+    const { daysUntil } = nextDueDate(bill.due_day, today);
     if (daysUntil < nextBillDaysUntil) {
       nextBill          = bill;
       nextBillDaysUntil = daysUntil;
@@ -191,7 +134,7 @@ function getSummary(accountId = null) {
   if (nextNextPaycheckDate) {
     for (const bill of bills) {
       if (!bill.amount) continue;
-      const { nextDate } = nextDueInfo(bill.due_day, today);
+      const { nextDate } = nextDueDate(bill.due_day, today);
       if (nextDate <= nextNextPaycheckDate) {
         upcomingBillsTotal += bill.amount;
         upcomingBills.push({ ...bill, nextDate });
@@ -320,12 +263,12 @@ if (parseFloat(paycheckAmountOverride) > 0) {
       status        = 'setup';
       statusMessage = 'Set up your paycheck schedule';
     } else if (bills.length === 0) {
-      cushion = balance - buffer;
+      cushion = calcCushion(balance, 0, buffer)
       status = cushion >= 0 ? 'ok' : balance >= 0 ? 'tight' : 'danger';
       statusMessage = status === 'ok' ? "You're okay" : status === 'tight' ? 'Tight but covered' : 'Watch your spending';
     } else {
       const estimatedDiscretionarySpend = avgDailyDiscretionary * (daysUntilPaycheck ?? 0);
-      cushion = balance - billsBeforeNextTotal - buffer;
+      cushion = calcCushion(balance, billsBeforeNextTotal, buffer);
       if (cushion >= 0) {
         status        = 'ok';
         statusMessage = "You're okay";
